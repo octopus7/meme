@@ -11,9 +11,22 @@ const authEnv = Object.assign({} as Env, {
 });
 
 describe("authenticated web worker", () => {
-  it("redirects an unauthenticated request to Google", async () => {
+  it("shows a login button for an unauthenticated root request", async () => {
     const response = await worker.fetch(
-      new Request("https://meme.example/search"),
+      new Request("https://meme.example/"),
+      authEnv
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("Google로 로그인");
+    expect(body).toContain('href="/auth/login?return_to=%2F"');
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("redirects to Google only after the login button is used", async () => {
+    const response = await worker.fetch(
+      new Request("https://meme.example/auth/login?return_to=%2Fsearch"),
       authEnv
     );
 
@@ -137,7 +150,17 @@ describe("authenticated web worker", () => {
       authEnv
     );
 
-    expect(response.status).toBe(302);
-    expect(response.headers.get("location")).toContain("accounts.google.com");
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Google로 로그인");
+  });
+
+  it("returns 401 for an unauthenticated API request", async () => {
+    const response = await worker.fetch(
+      new Request("https://meme.example/api/search?q=test"),
+      authEnv
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "Authentication required" });
   });
 });

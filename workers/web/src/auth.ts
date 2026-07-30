@@ -1,3 +1,5 @@
+import { html } from "./html";
+
 const AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const JWKS_ENDPOINT = "https://www.googleapis.com/oauth2/v3/certs";
@@ -159,6 +161,11 @@ function safeReturnTo(value: string | null): string {
   } catch {
     return "/";
   }
+}
+
+function loginPage(returnTo: string): Response {
+  const href = `/auth/login?return_to=${encodeURIComponent(returnTo)}`;
+  return html(`<main class="login-shell"><section class="login-card"><p class="login-eyebrow">private meme library</p><h1>meme</h1><p>계속하려면 허용된 Google 계정으로 로그인하세요.</p><a class="google-login-button" href="${href}">Google로 로그인</a></section></main>`, 200, false);
 }
 
 function configuredRedirectUri(request: Request, env: Env): string {
@@ -382,6 +389,7 @@ async function validRequestSession(request: Request, env: Env): Promise<boolean>
 
 export async function authenticate(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
+  if (request.method === "GET" && url.pathname === "/assets/app.css") return null;
   if (request.method === "GET" && url.pathname === "/auth/callback") return callback(request, env);
   if (request.method === "GET" && url.pathname === "/auth/logout") {
     return redirect("/", [clearCookie(SESSION_COOKIE), clearCookie(TRANSACTION_COOKIE)]);
@@ -390,5 +398,8 @@ export async function authenticate(request: Request, env: Env): Promise<Response
     return createTransaction(request, env, safeReturnTo(url.searchParams.get("return_to")));
   }
   if (await validRequestSession(request, env)) return null;
-  return createTransaction(request, env, safeReturnTo(`${url.pathname}${url.search}`));
+  if (request.method !== "GET" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/assets/")) {
+    return authError("Authentication required", 401);
+  }
+  return loginPage(safeReturnTo(`${url.pathname}${url.search}`));
 }

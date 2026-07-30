@@ -40,6 +40,13 @@ a{color:#3157c8}
 .empty-state{grid-column:1/-1;margin:2rem 0;padding:2rem;border:1px dashed #cbd3e1;border-radius:14px;color:#667085;text-align:center}
 .next-page{text-align:center}
 .next-page a{display:inline-block;padding:.65rem 1rem;border-radius:999px;background:#3157c8;color:#fff;text-decoration:none}
+.login-shell{display:grid;min-height:100vh;place-items:center;padding:1rem}
+.login-card{box-sizing:border-box;width:min(420px,100%);padding:clamp(1.5rem,6vw,2.5rem);border:1px solid #e1e6ef;border-radius:20px;background:#fff;box-shadow:0 20px 60px rgba(33,48,82,.14);text-align:center}
+.login-card h1{margin:.2rem 0 .75rem;font-size:2.4rem;letter-spacing:-.06em}
+.login-card>p:not(.login-eyebrow){margin:0 0 1.5rem;color:#667085;line-height:1.6}
+.login-eyebrow{margin:0;color:#3157c8;font-size:.75rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.google-login-button{display:inline-flex;align-items:center;justify-content:center;min-height:2.75rem;padding:0 1.2rem;border-radius:10px;background:#3157c8;color:#fff;font-weight:750;text-decoration:none;box-shadow:0 8px 18px rgba(49,87,200,.24)}
+.google-login-button:hover{background:#2748aa}
 .upload-console{box-sizing:border-box;width:100%;min-height:8rem;max-height:20rem;overflow:auto;margin:.75rem 0;padding:.75rem;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#c9d1d9;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .upload-console:empty::before{content:"업로드 로그 대기 중";color:#8b949e}
 footer{box-sizing:border-box;width:min(1180px,100%);margin:1rem auto 0;padding:0 clamp(1rem,4vw,2.5rem) 1.5rem;color:#667085}
