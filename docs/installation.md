@@ -6,7 +6,6 @@
 ## 준비 사항
 
 - Cloudflare에 연결된 도메인
-- Google 계정과 Cloudflare Zero Trust 사용 권한
 - GitHub Actions가 활성화된 이 저장소
 - x86-64 Synology/XPEnology의 Container Manager(Docker) 또는 .NET 10 실행 환경
 - Linux 서버에서 외부 Cloudflare로 나가는 HTTPS 연결
@@ -15,7 +14,7 @@
 권장 호스트 분리는 다음과 같습니다.
 
 ```text
-app.example.com  인증 웹 Worker
+app.example.com  공개 웹 Worker
 img.example.com  공개 이미지 Worker
 ```
 
@@ -90,23 +89,22 @@ GitHub Actions에서 다음 순서로 실행합니다.
 Worker의 Custom Domain과 Route는 대시보드에서 관리합니다. 도메인·zone ID를
 Wrangler 파일에 커밋하지 않습니다.
 
-## 5. Access 적용
+## 5. 공개 도메인 확인
 
-[Access와 Google 로그인](cloudflare-access.md)을 따라 `app.example.com/*`에만
-Access를 적용합니다. `img.example.com`에는 Access 정책을 적용하지 않습니다.
-정상 로그인 후 앱의 `/` 응답이 `/search`로 이동하는지 확인합니다.
+`app.example.com`과 `img.example.com` 모두 인증 없이 공개합니다.
+`app.example.com/`이 `/search`로 이동하고 정적 화면과 API가 정상 응답하는지
+확인합니다. 업로드와 삭제 API도 공개되므로 이 구성이 의도한 운영 정책인지
+배포 전에 확인합니다.
 
 ## 6. 점검
 
-로그인하지 않은 브라우저와 로그인한 브라우저를 분리해 확인합니다.
-
-- `app.example.com`은 Google 로그인 없이는 열리지 않는다.
-- 허용 목록에 없는 Google 계정은 거부된다.
+- 비공개 브라우저 창에서 별도 인증 없이 `app.example.com`이 열린다.
+- `/`가 `/search`로 이동한다.
 - `/search`의 빈 입력은 이미지 요청이나 검색 API 호출을 만들지 않는다.
 - 검색 입력 중 결과가 최대 5개만 나타난다.
-- `/all`은 현재 로그인 사용자의 항목만 표시한다.
+- `/all`은 전체 항목을 표시한다.
 - 같은 파일을 두 번 올려도 origin의 원본 파일 수가 늘지 않는다.
-- `img.example.com/i/...`와 `/t/...`는 로그인 없이 열리고 `HEAD`가 동작한다.
+- `img.example.com/i/...`와 `/t/...`는 인증 없이 열리고 `HEAD`가 동작한다.
 - 두 번째 이미지 요청의 `Cf-Cache-Status`가 `HIT`이며 origin access log가 늘지 않는다.
 - 마지막 참조 삭제 및 purge 완료 후 두 이미지 URL이 404가 된다.
 

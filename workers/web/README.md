@@ -1,7 +1,7 @@
-# 인증 웹 Worker
+# 공개 웹 Worker
 
-이 디렉터리는 독립적으로 배포됩니다. Cloudflare 계정 ID, D1 ID, Access audience,
-호스트명과 API 토큰은 저장하지 않습니다.
+이 디렉터리는 독립적으로 배포됩니다. Cloudflare 계정 ID, D1 ID, 호스트명과
+API 토큰은 저장하지 않습니다.
 
 ## 설정 생성
 
@@ -10,17 +10,15 @@ CI는 GitHub Environment 변수로 아래 값을 제공한 뒤
 `.wrangler.generated.jsonc`와 Worker 타입 파일은 Git에서 무시됩니다.
 
 - `WEB_WORKER_NAME`
-- `ACCESS_TEAM_DOMAIN`
-- `ACCESS_AUD`
 - `IMAGE_ORIGIN`
 - `D1_DATABASE_NAME`
 - `D1_DATABASE_ID`
 - `STORAGE_WORKER_NAME`
 
-`CLOUDFLARE_API_TOKEN`과 `CLOUDFLARE_ACCOUNT_ID`는 GitHub Environment secret으로만
-관리합니다. Access 애플리케이션과 Google 허용 정책은 Cloudflare 대시보드에서
-설정합니다. 모든 웹 Worker 경로는 Access로 보호되며 Worker도
-`Cf-Access-Jwt-Assertion` 서명을 검증합니다.
+`CLOUDFLARE_API_TOKEN`은 GitHub Environment secret으로, `CF_ACCOUNT_ID`는
+Environment variable로 관리합니다. 웹 화면과 API는 인증 없이 공개되며 업로드와
+삭제도 누구나 실행할 수 있습니다. 접근 제한이 필요하면 배포 전에 별도의 인증
+계층을 추가해야 합니다.
 
 `STORAGE_ADMIN` 서비스 바인딩 계약은 다음과 같습니다.
 

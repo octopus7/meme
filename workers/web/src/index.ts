@@ -1,8 +1,7 @@
-import { authenticate } from "./auth";
 import { ALL_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
 import { addItem, encodeCursor, list, search, searchTerms, type ImageRow } from "./db";
 import { escapeHtml, highlight, html, textBytes } from "./html";
-import type { StoredBlob, User } from "./types";
+import type { StoredBlob } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" };
 
@@ -45,7 +44,7 @@ function validBlob(value: unknown): value is StoredBlob {
     && typeof blob.size === "number" && Number.isSafeInteger(blob.size) && blob.size >= 0;
 }
 
-async function upload(request: Request, env: Env, user: User): Promise<Response> {
+async function upload(request: Request, env: Env): Promise<Response> {
   if (!sameOrigin(request)) return json({ error: "Forbidden origin" }, 403);
   const length = Number(request.headers.get("content-length"));
   const max = Number(env.MAX_UPLOAD_BYTES ?? "20971520");
@@ -82,7 +81,7 @@ async function upload(request: Request, env: Env, user: User): Promise<Response>
   const value: unknown = await storageResponse.json();
   if (!validBlob(value)) return json({ error: "Invalid response from image storage" }, 502);
   try {
-    const id = await addItem(env, user, value, description, filename);
+    const id = await addItem(env, value, description, filename);
     return json({ id, hash: value.hash }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: "metadata_write_failed", hash: value.hash, error: String(error) }));
@@ -90,13 +89,13 @@ async function upload(request: Request, env: Env, user: User): Promise<Response>
   }
 }
 
-async function removeImage(id: string, request: Request, env: Env, user: User): Promise<Response> {
+async function removeImage(id: string, request: Request, env: Env): Promise<Response> {
   if (!sameOrigin(request)) return json({ error: "Forbidden origin" }, 403);
-  const row = await env.DB.prepare("SELECT blob_hash FROM image_items WHERE id=? AND owner_sub=?")
-    .bind(id, user.sub).first<{ blob_hash: string }>();
+  const row = await env.DB.prepare("SELECT blob_hash FROM image_items WHERE id=?")
+    .bind(id).first<{ blob_hash: string }>();
   if (!row) return json({ error: "Not found" }, 404);
 
-  await env.DB.prepare("DELETE FROM image_items WHERE id=? AND owner_sub=?").bind(id, user.sub).run();
+  await env.DB.prepare("DELETE FROM image_items WHERE blob_hash=?").bind(row.blob_hash).run();
   await env.DB.prepare(
     `UPDATE blobs SET state='trash_pending'
      WHERE hash=? AND state='active'
@@ -130,7 +129,7 @@ async function retryPendingTrash(env: Env): Promise<void> {
   for (const row of pending.results) await trashBlob(env, row.hash);
 }
 
-async function route(request: Request, env: Env, user: User): Promise<Response> {
+async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/") return Response.redirect(new URL("/search", url), 302);
   if (request.method === "GET" && url.pathname === "/assets/search.js") {
@@ -148,14 +147,14 @@ async function route(request: Request, env: Env, user: User): Promise<Response> 
   if (request.method === "GET" && url.pathname === "/api/search") {
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 200);
     if (!query) return new Response("", { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
-    const rows = await search(env, user, query, 5);
+    const rows = await search(env, query, 5);
     const body = rows.map((row) => imageMarkup(row, env, searchTerms(query))).join("");
     return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
   if (request.method === "GET" && url.pathname === "/all") {
     let rows: ImageRow[];
     try {
-      rows = await list(env, user, url.searchParams.get("cursor"), 51);
+      rows = await list(env, url.searchParams.get("cursor"), 51);
     } catch {
       return html("<p>잘못된 페이지 주소입니다.</p>", 400);
     }
@@ -167,23 +166,16 @@ async function route(request: Request, env: Env, user: User): Promise<Response> 
   if (request.method === "GET" && url.pathname === "/upload") {
     return html(`<nav><a href="/search">search</a> <a href="/all">all</a></nav><main><form><input name="image" type="file" accept="image/*" required><input name="description" aria-label="설명" maxlength="500" required><button>upload</button></form><p id="message"></p></main><script src="/assets/upload.js" defer></script>`);
   }
-  if (request.method === "POST" && url.pathname === "/api/images") return upload(request, env, user);
+  if (request.method === "POST" && url.pathname === "/api/images") return upload(request, env);
   const match = /^\/api\/images\/([0-9a-f-]{36})$/u.exec(url.pathname);
-  if (request.method === "DELETE" && match?.[1]) return removeImage(match[1], request, env, user);
+  if (request.method === "DELETE" && match?.[1]) return removeImage(match[1], request, env);
   return json({ error: "Not found" }, 404);
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
-    let user: User;
     try {
-      user = await authenticate(request, env);
-    } catch (error) {
-      console.warn(JSON.stringify({ event: "access_denied", error: String(error) }));
-      return new Response("Unauthorized", { status: 401, headers: { "cache-control": "private, no-store" } });
-    }
-    try {
-      return await route(request, env, user);
+      return await route(request, env);
     } catch (error) {
       console.error(JSON.stringify({ event: "request_failed", path: new URL(request.url).pathname, error: String(error) }));
       return json({ error: "Internal server error" }, 500);

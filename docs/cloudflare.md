@@ -5,13 +5,13 @@
 
 ## D1
 
-D1에는 물리 blob과 사용자별 참조를 구분해 저장합니다. migration의 기준 원본은
+D1에는 물리 blob과 컬렉션 항목 참조를 구분해 저장합니다. migration의 기준 원본은
 `database/d1/migrations`이며, 운영 migration은 자동 Worker 배포와 분리된 수동
 워크플로만 적용합니다.
 
 ```text
 blob: SHA-256, canonical extension, MIME, size, active/trashed 상태
-item: user identity, blob hash, 설명, 원래 파일명, 생성/삭제 시각
+item: 내부 소유자 식별값, blob hash, 설명, 원래 파일명, 생성/삭제 시각
 ```
 
 원래 파일명은 검색 대상이지만 검색 결과 화면이나 API 응답에는 표시하지 않습니다.
@@ -40,7 +40,9 @@ Workers VPC는 현재 beta일 수 있으므로 배포 전에
 
 Workers VPC용 Tunnel은 공개 ingress를 만들 필요가 없습니다. NAS 공유 포트,
 SSH 또는 관리 UI를 VPC Service에 포함하지 않습니다. storage Worker token은
-기존 VPC Service를 바인딩할 수 있는 최소 권한만 부여합니다.
+Account `Workers Scripts: Edit`만 부여하고, token 발급 사용자에게 기존 VPC
+Service를 바인딩할 수 있는 `Connectivity Directory Bind` account member role을
+부여합니다. Admin role은 필요하지 않습니다.
 
 두 origin은 동일 URI와 JSON 계약을 제공하므로 Worker 코드는 바꾸지 않습니다.
 VPC Service는 fetch URL의 포트를 무시하고 등록된 포트를 사용하므로 전환 시
@@ -69,7 +71,7 @@ Settings에 직접 등록하고 배포에서는 `--keep-vars`를 사용해 유�
 
 ## 공개 storage Worker
 
-storage Worker의 Custom Domain은 Access 없이 공개합니다. Worker 자체 caching을
+storage Worker의 Custom Domain은 공개합니다. Worker 자체 caching을
 활성화하고 `cross_version_cache=true`를 사용해 코드 배포가 origin 재요청 폭증으로
 이어지지 않게 합니다.
 
@@ -93,15 +95,13 @@ Worker 코드와 VPC/origin 요청이 실행되지 않아야 합니다.
 
 ## 도메인과 secret
 
-Custom Domain, Access application 및 DNS는 대시보드에서 설정합니다. 다음 값은
+Custom Domain과 DNS는 대시보드에서 설정합니다. 다음 값은
 소스 코드나 Wrangler 파일에 넣지 않습니다.
 
 - `CLOUDFLARE_API_TOKEN`
 - account/zone ID, D1 ID, VPC Service ID
-- Google OAuth secret
 - Tunnel token
 - origin 내부 인증 secret
-- 실제 사용자 이메일
 
 런타임 secret이 필요하면 Cloudflare Worker 대시보드의 **Settings → Variables and
 Secrets**에 encrypted secret으로 넣습니다. GitHub가 값을 갱신해야 하는 특별한

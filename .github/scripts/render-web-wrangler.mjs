@@ -17,8 +17,6 @@ const config = {
   cache: { enabled: false },
   observability: { enabled: true },
   vars: {
-    ACCESS_TEAM_DOMAIN: required("ACCESS_TEAM_DOMAIN"),
-    ACCESS_AUD: required("ACCESS_AUD"),
     IMAGE_ORIGIN: required("IMAGE_ORIGIN"),
     MAX_UPLOAD_BYTES: "20971520",
   },

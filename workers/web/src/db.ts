@@ -1,4 +1,7 @@
-import type { StoredBlob, User } from "./types";
+import type { StoredBlob } from "./types";
+
+const LEGACY_OWNER_SUB = "public";
+const LEGACY_OWNER_EMAIL = "public@localhost";
 
 export interface ImageRow {
   id: string;
@@ -16,37 +19,53 @@ function likePattern(term: string): string {
   return `%${term.replace(/[\\%_]/g, "\\$&")}%`;
 }
 
-export async function search(env: Env, user: User, query: string, limit: number): Promise<ImageRow[]> {
+export async function search(env: Env, query: string, limit: number): Promise<ImageRow[]> {
   const terms = searchTerms(query);
   if (!terms.length) return [];
   const clauses = terms.map(() => "(i.description LIKE ? ESCAPE '\\' OR i.original_filename LIKE ? ESCAPE '\\')");
-  const params: unknown[] = [user.sub];
+  const params: unknown[] = [];
   for (const term of terms) params.push(likePattern(term), likePattern(term));
   params.push(limit);
   const result = await env.DB.prepare(
     `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
      FROM image_items i JOIN blobs b ON b.hash = i.blob_hash
-     WHERE i.owner_sub = ? AND b.state = 'active' AND ${clauses.join(" AND ")}
+     WHERE b.state = 'active'
+       AND i.id = (
+         SELECT duplicate.id FROM image_items duplicate
+         WHERE duplicate.blob_hash=i.blob_hash
+         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
+       )
+       AND ${clauses.join(" AND ")}
      ORDER BY i.created_at DESC, i.id DESC LIMIT ?`
   ).bind(...params).all<ImageRow>();
   return result.results;
 }
 
-export async function list(env: Env, user: User, cursor: string | null, limit: number): Promise<ImageRow[]> {
+export async function list(env: Env, cursor: string | null, limit: number): Promise<ImageRow[]> {
   const decoded = cursor ? decodeCursor(cursor) : null;
   const sql = decoded
     ? `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
-       WHERE i.owner_sub=? AND b.state='active'
+       WHERE b.state='active'
+       AND i.id = (
+         SELECT duplicate.id FROM image_items duplicate
+         WHERE duplicate.blob_hash=i.blob_hash
+         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
+       )
        AND (i.created_at < ? OR (i.created_at = ? AND i.id < ?))
        ORDER BY i.created_at DESC, i.id DESC LIMIT ?`
     : `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
-       WHERE i.owner_sub=? AND b.state='active'
+       WHERE b.state='active'
+       AND i.id = (
+         SELECT duplicate.id FROM image_items duplicate
+         WHERE duplicate.blob_hash=i.blob_hash
+         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
+       )
        ORDER BY i.created_at DESC, i.id DESC LIMIT ?`;
   const values = decoded
-    ? [user.sub, decoded.createdAt, decoded.createdAt, decoded.id, limit]
-    : [user.sub, limit];
+    ? [decoded.createdAt, decoded.createdAt, decoded.id, limit]
+    : [limit];
   const result = await env.DB.prepare(sql).bind(...values).all<ImageRow>();
   return result.results;
 }
@@ -69,9 +88,19 @@ function decodeCursor(cursor: string): { createdAt: string; id: string } {
   }
 }
 
-export async function addItem(env: Env, user: User, blob: StoredBlob, description: string, filename: string): Promise<string> {
+export async function addItem(env: Env, blob: StoredBlob, description: string, filename: string): Promise<string> {
   const current = await env.DB.prepare("SELECT state FROM blobs WHERE hash=?").bind(blob.hash).first<{ state: string }>();
   if (current && current.state !== "active") throw new Error("Blob is not active");
+  const existing = await env.DB.prepare(
+    "SELECT id FROM image_items WHERE blob_hash=? ORDER BY created_at, id LIMIT 1"
+  ).bind(blob.hash).first<{ id: string }>();
+  if (existing) {
+    await env.DB.prepare(
+      "UPDATE image_items SET description=?, original_filename=? WHERE id=?"
+    ).bind(description, filename, existing.id).run();
+    return existing.id;
+  }
+
   const id = crypto.randomUUID();
   await env.DB.batch([
     env.DB.prepare(
@@ -84,10 +113,10 @@ export async function addItem(env: Env, user: User, blob: StoredBlob, descriptio
        VALUES(?, ?, ?, ?, ?, ?)
        ON CONFLICT(owner_sub, blob_hash) DO UPDATE SET
          description=excluded.description, original_filename=excluded.original_filename`
-    ).bind(id, user.sub, user.email, blob.hash, description, filename)
+    ).bind(id, LEGACY_OWNER_SUB, LEGACY_OWNER_EMAIL, blob.hash, description, filename)
   ]);
   const row = await env.DB.prepare("SELECT id FROM image_items WHERE owner_sub=? AND blob_hash=?")
-    .bind(user.sub, blob.hash).first<{ id: string }>();
+    .bind(LEGACY_OWNER_SUB, blob.hash).first<{ id: string }>();
   if (!row) throw new Error("Failed to store image metadata");
   return row.id;
 }

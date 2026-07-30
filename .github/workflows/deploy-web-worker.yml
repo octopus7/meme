@@ -30,8 +30,6 @@ jobs:
       D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
       D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
       STORAGE_WORKER_NAME: ${{ vars.STORAGE_WORKER_NAME }}
-      ACCESS_TEAM_DOMAIN: ${{ vars.ACCESS_TEAM_DOMAIN }}
-      ACCESS_AUD: ${{ vars.ACCESS_AUD }}
       IMAGE_ORIGIN: ${{ vars.IMAGE_ORIGIN }}
 
     steps:

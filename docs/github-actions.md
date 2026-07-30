@@ -24,8 +24,6 @@ d1-production
 | variable | `D1_DATABASE_NAME` | D1 표시 이름 |
 | variable | `D1_DATABASE_ID` | D1 database ID |
 | variable | `STORAGE_WORKER_NAME` | service binding 대상 Worker 이름 |
-| variable | `ACCESS_TEAM_DOMAIN` | `<team>.cloudflareaccess.com` 값 |
-| variable | `ACCESS_AUD` | Access application AUD tag |
 | variable | `IMAGE_ORIGIN` | 공개 이미지 origin, 예: `https://img.example.com` |
 
 ### storage-production
@@ -49,19 +47,30 @@ d1-production
 
 account ID와 resource ID는 비밀 credential은 아니지만 계정 정보가 저장소에
 고정되지 않도록 GitHub variables로 관리합니다. API token은 반드시 secret으로
-관리합니다. Google OAuth secret과 Tunnel token은 GitHub에 둘 필요가 없습니다.
+관리합니다. Workers VPC용 Tunnel token은 GitHub에 둘 필요가 없습니다.
 
 ## Token 최소 권한
 
-각 token의 resource scope를 운영 account와 해당 resource로 제한합니다.
+각 token의 resource scope를 운영 account 하나로 제한합니다. 현재 D1 token은
+특정 database 하나가 아니라 account 단위로 제한되므로 migration 전용 token으로
+분리합니다.
 
-- web: Workers Scripts write, D1 binding에 필요한 read/bind 권한
-- storage: Workers Scripts write, 기존 VPC Service bind 권한
-- D1: 해당 D1 edit
+- `web-production`: Account → Workers Scripts → Edit
+- `storage-production`: Account → Workers Scripts → Edit. 또한 token을 발급하는
+  계정 구성원에게 기존 VPC Service를 binding할 수 있는
+  `Connectivity Directory Bind` account member role이 필요합니다. Admin role은
+  필요하지 않습니다.
+- `d1-production`: Account → D1 → Edit
 
 Cloudflare 권한 이름은 변경될 수 있으므로 token 생성 화면의 현재 명칭과
 [Workers VPC required roles](https://developers.cloudflare.com/workers-vpc/configuration/vpc-services/#required-roles)를
-확인합니다. 하나의 광범위한 Global API Key를 세 Environment에서 공유하지 않습니다.
+확인합니다. 세 token을 각각 발급하고, 하나의 광범위한 Global API Key나 token을
+세 Environment에서 공유하지 않습니다.
+
+공식 참고:
+
+- [API token 생성](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
+- [API token 권한 목록](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
 
 ## Workflow별 영향 범위
 
@@ -78,7 +87,8 @@ Cloudflare 권한 이름은 변경될 수 있으므로 token 생성 화면의 �
 포함되어 있습니다. 배포 command의 `--keep-vars`는 Cloudflare 대시보드에서
 관리하는 런타임 secret/variable을 보존합니다.
 
-Custom Domain, Access, Tunnel과 VPC Service 생성은 workflow가 변경하지 않습니다.
+Custom Domain, Workers VPC용 Tunnel과 VPC Service 생성은 workflow가 변경하지
+않습니다.
 Worker 배포가 Linux 파일을 복사·삭제하거나 서비스를 재시작하는 단계도 없습니다.
 origin build는 Node.js 24에서 `npm ci`, test, Linux x64용 `sharp` 0.35.3 로드와
 Docker image build를 검증합니다. artifact에는 Container Manager와 systemd
@@ -114,3 +124,4 @@ secret으로 등록합니다. 값은 선택한 Node origin의
 32자 이상의 무작위 값이어야 합니다. 두 origin을 병행 검증한다면 같은 관리
 token을 안전하게 설정할 수 있습니다. 배포 workflow는 `wrangler secret put`을
 자동 실행하지 않으므로 secret 값이 로그나 임시 config에 들어가지 않습니다.
+`ORIGIN_ADMIN_TOKEN`은 GitHub Environment에는 등록하지 않습니다.
