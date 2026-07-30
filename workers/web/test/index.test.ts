@@ -45,6 +45,26 @@ describe("authenticated web worker", () => {
     expect(await response.text()).not.toBe("");
   });
 
+  it("serves baked deployment metadata with a valid session", async () => {
+    const session = await createSessionValue({
+      sub: "google-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/assets/deployment-info.json", {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      authEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({
+      commitSha: "development"
+    });
+  });
+
   it("rejects a tampered session", async () => {
     const response = await worker.fetch(
       new Request("https://meme.example/search", {

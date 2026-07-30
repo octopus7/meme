@@ -1,6 +1,7 @@
-import { ALL_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
+import { ALL_JS, DEPLOYMENT_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
 import { authenticate } from "./auth";
 import { addItem, encodeCursor, list, search, searchTerms, type ImageRow } from "./db";
+import deploymentInfo from "./deployment-info.generated.json";
 import { escapeHtml, highlight, html, textBytes } from "./html";
 import type { StoredBlob } from "./types";
 
@@ -141,6 +142,12 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   if (request.method === "GET" && url.pathname === "/assets/all.js") {
     return new Response(ALL_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
+  }
+  if (request.method === "GET" && url.pathname === "/assets/deployment.js") {
+    return new Response(DEPLOYMENT_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
+  }
+  if (request.method === "GET" && url.pathname === "/assets/deployment-info.json") {
+    return new Response(JSON.stringify(deploymentInfo), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
   if (request.method === "GET" && url.pathname === "/search") {
     return html(`<main><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p><a href="/all">all</a></p><div id="results"></div></main><script src="/assets/search.js" defer></script>`);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeHtml, highlight } from "../src/html";
+import { escapeHtml, highlight, html } from "../src/html";
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
@@ -13,5 +13,13 @@ describe("HTML helpers", () => {
 
   it("deduplicates and limits search terms", () => {
     expect(searchTerms(" a  a b ")).toEqual(["a", "b"]);
+  });
+
+  it("adds deployment information to every HTML page", async () => {
+    const response = html("<main>content</main>");
+    const body = await response.text();
+
+    expect(body).toContain('id="deployment-info"');
+    expect(body).toContain('src="/assets/deployment.js"');
   });
 });

@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "workers/web/**"
+      - ".github/scripts/render-deployment-info.mjs"
       - ".github/scripts/render-web-wrangler.mjs"
       - ".github/workflows/deploy-web-worker.yml"
   workflow_dispatch:
@@ -46,6 +47,9 @@ jobs:
 
       - run: npm ci
       - run: npm test --if-present
+
+      - name: Bake deployment metadata
+        run: node ../../.github/scripts/render-deployment-info.mjs src/deployment-info.generated.json
 
       - name: Render ephemeral Wrangler configuration
         run: node ../../.github/scripts/render-web-wrangler.mjs .wrangler.generated.jsonc

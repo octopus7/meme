@@ -11,7 +11,7 @@ export function escapeHtml(value: string): string {
 }
 
 export function html(body: string, status = 200): Response {
-  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><body>${body}</body></html>`, {
+  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><body>${body}<footer><small id="deployment-info">배포 정보 확인 중…</small></footer><script src="/assets/deployment.js" defer></script></body></html>`, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
