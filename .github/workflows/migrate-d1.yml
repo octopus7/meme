@@ -1,0 +1,48 @@
+name: Migrate D1
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meme-d1-production
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: d1-production
+    defaults:
+      run:
+        working-directory: workers/web
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+      D1_DATABASE_NAME: ${{ vars.D1_DATABASE_NAME }}
+      D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: workers/web/package-lock.json
+
+      - run: npm ci
+
+      - name: Render ephemeral Wrangler configuration
+        run: node ../../.github/scripts/render-d1-wrangler.mjs .wrangler.generated.jsonc
+
+      - name: List pending migrations
+        run: npx wrangler d1 migrations list "$D1_DATABASE_NAME" --remote --config .wrangler.generated.jsonc
+
+      - name: Apply D1 migrations
+        run: npx wrangler d1 migrations apply "$D1_DATABASE_NAME" --remote --config .wrangler.generated.jsonc
+
+      - name: Remove ephemeral configuration
+        if: always()
+        run: rm -f .wrangler.generated.jsonc

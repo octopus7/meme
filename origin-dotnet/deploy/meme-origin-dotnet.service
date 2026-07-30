@@ -1,0 +1,32 @@
+[Unit]
+Description=meme .NET image origin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meme-origin-dotnet
+Group=meme-origin-dotnet
+EnvironmentFile=/etc/meme-origin-dotnet/meme-origin-dotnet.env
+WorkingDirectory=/opt/meme-origin-dotnet/current
+ExecStart=/opt/meme-origin-dotnet/current/Meme.Origin
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+ReadWritePaths=/var/lib/meme-origin-dotnet /var/log/meme-origin-dotnet
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,64 @@
+name: Build origin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "origin/**"
+      - ".github/workflows/build-origin.yml"
+  pull_request:
+    paths:
+      - "origin/**"
+      - ".github/workflows/build-origin.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meme-origin-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: origin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.9.0
+          cache: npm
+          cache-dependency-path: origin/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Stage Node.js application
+        run: |
+          mkdir -p dist/app
+          cp package.json package-lock.json dist/app/
+          cp -R src dist/app/src
+
+      - name: Install Linux x64 production dependencies
+        run: npm ci --omit=dev --prefix dist/app
+
+      - name: Verify packaged sharp
+        working-directory: origin/dist/app
+        run: |
+          npm ls sharp@0.35.3 --depth=0
+          node -e "import('sharp').then(() => console.log('sharp load ok'))"
+
+      - name: Package systemd files
+        run: cp -R deploy dist/deploy
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meme-origin-node20-linux-x64-${{ github.sha }}
+          path: origin/dist
+          if-no-files-found: error
+          retention-days: 14

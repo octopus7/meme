@@ -1,0 +1,33 @@
+[Unit]
+Description=Meme private image origin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meme-origin
+Group=meme-origin
+EnvironmentFile=/etc/meme-origin/meme-origin.env
+WorkingDirectory=/opt/meme-origin/current
+ExecStart=/opt/meme-origin/node /opt/meme-origin/current/src/index.js
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+ReadWritePaths=/var/lib/meme-origin /var/log/meme-origin
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

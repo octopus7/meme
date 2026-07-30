@@ -1,0 +1,16 @@
+{
+  "name": "meme-origin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.9.0 <21"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "sharp": "0.35.3"
+  }
+}

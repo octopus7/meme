@@ -1,0 +1,21 @@
+{
+  "name": "@meme/web-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev --config .wrangler.generated.jsonc",
+    "build": "npm run types && npm run check && npm test && wrangler deploy --config .wrangler.generated.jsonc --dry-run --outdir dist",
+    "deploy": "wrangler deploy --config .wrangler.generated.jsonc --keep-vars --minify",
+    "types": "wrangler types src/worker-configuration.d.ts --config .wrangler.generated.jsonc"
+  },
+  "dependencies": {
+    "jose": "^6.2.5"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.115.0"
+  }
+}

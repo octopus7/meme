@@ -33,6 +33,7 @@ Cloudflare Tunnel을 통해서만 원본 서버에 접근하며, 성공 응답�
 6. [.NET 10 origin 서비스](docs/origin-dotnet.md)
 7. [GitHub Actions 변수·비밀 및 격리 정책](docs/github-actions.md)
 8. [캐시, 삭제와 복구 동작](docs/operations.md)
+9. [운영 설정 체크리스트](docs/setup-checklist.md)
 
 실제 계정 ID, 데이터베이스 ID, VPC Service ID, 도메인, 토큰 및 Tunnel 토큰은
 저장소에 커밋하지 않습니다. 예시의 `<...>` 값은 Cloudflare 대시보드나 GitHub

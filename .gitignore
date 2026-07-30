@@ -1,0 +1,36 @@
+# Local and generated Cloudflare configuration
+wrangler.json
+wrangler.jsonc
+wrangler.toml
+.wrangler/
+.dev.vars
+.dev.vars.*
+.wrangler.generated.json
+.wrangler.generated.jsonc
+wrangler.generated.json
+wrangler.generated.jsonc
+worker-configuration.d.ts
+worker-configuration.d.ts
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets.json
+
+# JavaScript
+node_modules/
+dist/
+coverage/
+
+# Origin build output
+origin/dist/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
