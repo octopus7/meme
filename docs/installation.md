@@ -7,7 +7,7 @@
 
 - Cloudflare에 연결된 도메인
 - GitHub Actions가 활성화된 이 저장소
-- x86-64 Synology/XPEnology의 Container Manager(Docker) 또는 .NET 10 실행 환경
+- x86-64 Synology/XPEnology의 Container Manager(Docker)
 - Linux 서버에서 외부 Cloudflare로 나가는 HTTPS 연결
 - origin 데이터 디렉터리를 위한 충분한 디스크와 별도 백업
 
@@ -21,35 +21,25 @@ img.example.com  공개 이미지 Worker
 `img.example.com`은 URL을 아는 누구나 접근할 수 있으므로 주소 자체를 비밀로
 간주하면 안 됩니다. 업로드·삭제·관리 API는 공개 이미지 경로와 분리됩니다.
 
-## 1. Linux origin 선택 및 설치
-
-동일한 URI와 JSON 계약을 제공하는 구현 중 하나를 선택합니다.
+## 1. Linux origin 설치
 
 - [Node.js 24 Docker origin 설치](origin.md): Container Manager project, 기본
   `127.0.0.1:8086`
-- [.NET 10 origin 설치](origin-dotnet.md): `meme-origin-dotnet.service`, 기본
-  `127.0.0.1:8087`
 
-두 서비스는 계정, 포트와 데이터 디렉터리가 분리되어 같은 장비에서 동시에 실행할
-수 있습니다. 8086과 8087용 VPC Service를 각각 준비한 뒤 실제 storage Worker는
-선택한 하나의 `VPC_SERVICE_ID`만 바인딩합니다.
-어느 구현이든 loopback 또는 Tunnel이 도달할 수 있는 사설 주소에서만 수신하게
+서비스는 loopback 또는 Tunnel이 도달할 수 있는 사설 주소에서만 수신하게
 하고 라우터의 포트 포워딩은 만들지 않습니다.
 
 Synology에서는 DSM에 Node를 직접 설치하지 않고 Debian Bookworm 기반 Node.js 24
 LTS 컨테이너를 사용합니다. 설치 소스는
 `https://github.com/octopus7/meme`의 `origin/`이며 실제 `.env`와 token은 NAS에만
-둡니다. Container Manager를 사용할 수 없다면 .NET 10 self-contained origin이나
-Node systemd fallback의 적합성을 별도로 검토합니다.
+둡니다. Container Manager를 사용할 수 없다면 Node systemd fallback의 적합성을
+별도로 검토합니다.
 
-선택한 서비스가 정상인지 Linux 서버에서 확인합니다.
+서비스가 정상인지 Linux 서버에서 확인합니다.
 
 ```bash
 # Node.js origin
 curl --fail http://127.0.0.1:8086/healthz
-
-# .NET 10 origin
-curl --fail http://127.0.0.1:8087/healthz
 ```
 
 ## 2. Tunnel과 VPC Service 생성
@@ -59,10 +49,9 @@ Tunnel을 만들고, Cloudflare가 표시한 설치 명령으로 `cloudflared`�
 등록합니다. Tunnel 토큰은 Linux의 systemd 자격 증명 또는 Cloudflare 설치
 절차에만 사용하고 GitHub에는 저장하지 않습니다.
 
-같은 Tunnel에 Node 8086용 HTTP VPC Service와 .NET 8087용 HTTP VPC Service를
-각각 만듭니다. VPC Service는 등록된 포트를 강제하므로 구현을 전환할 때 선택한
-Service ID를 GitHub `storage-production` Environment의 `VPC_SERVICE_ID`에 넣고
-그에 맞는 `ORIGIN_BASE_URL`도 함께 바꿉니다.
+같은 Tunnel에 Node 8086용 HTTP VPC Service를 만듭니다. Service ID를 GitHub
+`storage-production` Environment의 `VPC_SERVICE_ID`에 넣고 Node origin의 내부
+URL을 `ORIGIN_BASE_URL`에 설정합니다.
 
 ## 3. D1 생성
 

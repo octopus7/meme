@@ -35,8 +35,8 @@ Workers VPC는 현재 beta일 수 있으므로 배포 전에
 2. 대시보드가 Linux amd64용으로 표시한 명령으로 `cloudflared`를 설치합니다.
 3. Tunnel 상태가 healthy인지 확인합니다.
 4. **VPC Services → Create**에서 HTTP 서비스를 만듭니다.
-5. 같은 host에 Node `8086`용과 .NET `8087`용 HTTP VPC Service를 각각 만듭니다.
-6. 실제 사용할 구현의 Service ID를 GitHub 변수 `VPC_SERVICE_ID`에 저장합니다.
+5. Node `8086`용 HTTP VPC Service를 만듭니다.
+6. Service ID를 GitHub 변수 `VPC_SERVICE_ID`에 저장합니다.
 
 Workers VPC용 Tunnel은 공개 ingress를 만들 필요가 없습니다. NAS 공유 포트,
 SSH 또는 관리 UI를 VPC Service에 포함하지 않습니다. storage Worker token은
@@ -44,12 +44,9 @@ Account `Workers Scripts: Edit`만 부여하고, token 발급 사용자에게 �
 Service를 바인딩할 수 있는 `Connectivity Directory Bind` account member role을
 부여합니다. Admin role은 필요하지 않습니다.
 
-두 origin은 동일 URI와 JSON 계약을 제공하므로 Worker 코드는 바꾸지 않습니다.
-VPC Service는 fetch URL의 포트를 무시하고 등록된 포트를 사용하므로 전환 시
-`storage-production`의 `VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`을 함께 8086 또는
-8087 대상 값으로 바꿔 storage Worker를 재배포합니다. 두 서비스를 동시에 실행해
-전환 전 health check와 비교 검증을 할 수 있지만, 하나의 storage Worker 배포는
-한 번에 하나의 origin만 사용합니다.
+VPC Service는 fetch URL의 포트를 무시하고 등록된 포트를 사용하므로
+`storage-production`의 `VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`이 같은 Node origin을
+가리키도록 설정한 뒤 storage Worker를 배포합니다.
 
 공식 문서:
 

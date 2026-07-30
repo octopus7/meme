@@ -23,11 +23,9 @@ flowchart LR
     end
 
     subgraph HOME["가정 내부망 · XPEnology x86 J1900"]
-        C{"포트별 VPC Service 선택<br/>VPC_SERVICE_ID + ORIGIN_BASE_URL"}
         O["Node.js 24 Docker<br/>Container Manager<br/>127.0.0.1:8086"]
-        OD[".NET meme-origin-dotnet.service<br/>127.0.0.1:8087"]
-        F[("선택한 origin의 active 파일<br/>원본 + 128×128 WebP")]
-        X[("선택한 origin의 trash<br/>관리자만 복구 · 30일 후 삭제")]
+        F[("origin의 active 파일<br/>원본 + 128×128 WebP")]
+        X[("origin의 trash<br/>관리자만 복구 · 30일 후 삭제")]
     end
 
     U -->|"Google OAuth + 서명 세션"| W
@@ -39,13 +37,9 @@ flowchart LR
     M -->|"cache MISS"| V
     AD -->|"관리 REST"| V
     V --> T
-    T --> C
-    C -->|"Node 선택"| O
-    C -->|".NET 선택"| OD
+    T --> O
     O <--> F
-    OD <--> F
     O -->|"마지막 참조 삭제"| X
-    OD -->|"마지막 참조 삭제"| X
     X -->|"관리자 판단으로 복구"| F
     X -->|"30일 만료 purge"| P["물리 삭제"]
 ```
@@ -60,11 +54,8 @@ API는 외부에 노출하지 않고 `web Worker`에서 `Admin` named entrypoint
 호출하며, 그 작업을 시작하는 web Worker의 업로드·삭제 API에는 Google 인증이
 적용됩니다.
 
-Node.js origin은 8086, 동일 URI/JSON 계약의 .NET 10 origin은 8087을 사용합니다.
-두 서비스는 동시에 실행할 수 있으며 포트별 VPC Service를 각각 만든 뒤 storage
-Worker의 `VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`을 함께 바꿔 하나를 선택합니다.
-두 구현의 기본 데이터 디렉터리는 분리되어 있으므로 전환 전에 active 파일과
-휴지통 레코드를 일관된 상태로 마이그레이션하거나 별도 동기화해야 합니다.
+Node.js origin은 8086을 사용합니다. storage Worker의 `VPC_SERVICE_ID`와
+`ORIGIN_BASE_URL`은 이 origin을 가리킵니다.
 
 ## 이미지 조회와 엣지 캐시
 
@@ -75,7 +66,7 @@ flowchart TD
     C{"Media entrypoint<br/>엣지 캐시"}
     H["HIT<br/>캐시 응답"]
     V["MISS<br/>Workers VPC → Tunnel"]
-    O["선택한 origin<br/>Node 8086 또는 .NET 8087<br/>active 파일 읽기"]
+    O["Node origin 8086<br/>active 파일 읽기"]
     E["성공 응답 저장<br/>Cache-Tag: blob-{hash}"]
     N["404/오류<br/>no-store"]
 
@@ -99,7 +90,7 @@ sequenceDiagram
     participant W as web Worker
     participant D as D1
     participant A as storage Worker Admin
-    participant O as 선택한 Linux origin (8086/8087)
+    participant O as Node origin (8086)
     participant C as Cloudflare cache
 
     U->>W: 이미지 + 설명 + 원래 파일명
@@ -137,7 +128,6 @@ flowchart TB
         SW["deploy-storage-worker.yml<br/>storage-production"]
         DB["migrate-d1.yml<br/>d1-production · 수동 승인"]
         OB["build-origin.yml<br/>Node.js 24 + Docker 검증<br/>Linux x64 artifact"]
-        ODB["build-origin-dotnet.yml<br/>.NET 10<br/>self-contained Linux x64 artifact"]
     end
 
     GH -->|"workers/web/**"| WW --> W["web Worker만"]
@@ -145,15 +135,12 @@ flowchart TB
     GH -->|"database/d1/**"| DB --> D[("D1 schema만")]
     GH -->|"origin/**"| OB --> AR["Docker/Compose·Linux x64 앱·fallback 파일"]
     AR -->|"Container Manager에서 build/recreate"| O["Node origin container만 갱신"]
-    GH -->|"origin-dotnet/**"| ODB --> DAR["self-contained 앱·systemd 파일"]
-    DAR -->|"장비 관리자가 수동 설치"| DO["meme-origin-dotnet.service만 재시작"]
 ```
 
 각 Worker는 독립된 `package.json`, lockfile, 임시 Wrangler 설정 생성기와 workflow를 가집니다.
 web 배포는 storage Worker나 Linux 파일을 변경하지 않고, storage 배포도 web Worker,
-D1 migration, Linux 파일을 변경하지 않습니다. 두 origin workflow는 각각 자기
-artifact만 만들며 장비 관리자가 선택한 애플리케이션과 서비스 파일을 명시적으로
-설치합니다. 어느 origin build도 다른 origin이나 서버를 변경하지 않습니다.
+D1 migration, Linux 파일을 변경하지 않습니다. origin workflow는 artifact만
+만들며 서버를 변경하지 않습니다.
 
 Wrangler의 실제 설정은 Actions 실행 중 임시 생성 후 제거합니다. Cloudflare API
 토큰과 origin 관리 토큰은 대상별 GitHub Environment secret 또는 Cloudflare

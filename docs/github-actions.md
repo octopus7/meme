@@ -34,7 +34,7 @@ d1-production
 | variable | `CF_ACCOUNT_ID` | Cloudflare account ID |
 | variable | `STORAGE_WORKER_NAME` | 공개 storage Worker script 이름 |
 | variable | `VPC_SERVICE_ID` | 기존 HTTP VPC Service ID |
-| variable | `ORIGIN_BASE_URL` | 선택한 VPC origin URL: Node `http://meme-origin.internal:8086` 또는 .NET `http://meme-origin.internal:8087` |
+| variable | `ORIGIN_BASE_URL` | Node VPC origin URL, 예: `http://meme-origin.internal:8086` |
 
 ### d1-production
 
@@ -79,7 +79,6 @@ Cloudflare 권한 이름은 변경될 수 있으므로 token 생성 화면의 �
 | `Deploy web Worker` | `workers/web/**` push 또는 수동 | web Worker만 |
 | `Deploy storage Worker` | `workers/storage/**` push 또는 수동 | storage Worker만 |
 | `Build origin` | `origin/**` push/PR 또는 수동 | Node.js 24 Docker 검증 및 Linux x64 GitHub artifact만 |
-| `Build .NET origin` | `origin-dotnet/**` push/PR 또는 수동 | .NET 10 self-contained Linux x64 GitHub artifact만 |
 | `Migrate D1` | 수동 | D1 schema만 |
 
 각 deploy job은 자기 디렉터리에서만 `npm ci`와 Wrangler를 실행합니다. 런타임에
@@ -94,10 +93,8 @@ origin build는 Node.js 24에서 `npm ci`, test, Linux x64용 `sharp` 0.35.3 로
 Docker image build를 검증합니다. artifact에는 Container Manager와 systemd
 fallback 파일이 포함되지만 서버 접속 credential은 사용하지 않습니다.
 
-.NET origin build는 .NET SDK 10.0.x에서 lockfile 기반 restore, Release test,
-`linux-x64` self-contained publish를 수행합니다. 두 origin workflow 모두
-artifact만 생성하며 서버에 접속하거나 Worker, D1, 다른 origin 파일을 변경하지
-않습니다.
+origin workflow는 artifact만 생성하며 서버에 접속하거나 Worker 또는 D1을
+변경하지 않습니다.
 
 ## D1 migration
 
@@ -119,9 +116,7 @@ column/table 제거는 별도 release로 나눕니다.
 ## Runtime secret
 
 storage Worker에는 Cloudflare 대시보드에서 `ORIGIN_ADMIN_TOKEN`을 encrypted
-secret으로 등록합니다. 값은 선택한 Node origin의
-`MEME_ORIGIN_MUTATION_TOKEN` 또는 .NET origin의 `MUTATION_TOKEN`과 같아야 하며
-32자 이상의 무작위 값이어야 합니다. 두 origin을 병행 검증한다면 같은 관리
-token을 안전하게 설정할 수 있습니다. 배포 workflow는 `wrangler secret put`을
+secret으로 등록합니다. 값은 Node origin의 `MEME_ORIGIN_MUTATION_TOKEN`과
+같아야 하며 32자 이상의 무작위 값이어야 합니다. 배포 workflow는 `wrangler secret put`을
 자동 실행하지 않으므로 secret 값이 로그나 임시 config에 들어가지 않습니다.
 `ORIGIN_ADMIN_TOKEN`은 GitHub Environment에는 등록하지 않습니다.

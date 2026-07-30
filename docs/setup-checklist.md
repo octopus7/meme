@@ -4,9 +4,9 @@
 
 ## 1. Origin 설치
 
-- [ ] Node `8086` 또는 .NET `8087` 구현 선택
-- [ ] NAS 사용자 홈의 `~/meme`에 clone 및 서비스 설치
-- [ ] `systemctl status` 확인
+- [ ] Node origin `8086` 설치
+- [ ] `/volume1/docker/meme-origin`에 설치
+- [ ] Container Manager project와 health 상태 확인
 - [ ] 로컬 `/healthz` 성공 확인
 - [ ] 자동 생성된 origin mutation token 확인
 - [ ] 라우터 포트 포워딩이 없는지 확인
@@ -17,8 +17,7 @@
 - [ ] D1 생성: 이름과 Database ID 기록
 - [ ] Cloudflare Tunnel 생성 및 NAS에 `cloudflared` 설치
 - [ ] Node용 HTTP VPC Service 생성: 내부 호스트, port `8086`
-- [ ] .NET용 HTTP VPC Service 생성: 내부 호스트, port `8087`
-- [ ] 사용할 VPC Service ID 선택
+- [ ] Node용 VPC Service ID 기록
 - [ ] web Worker 이름 결정
 - [ ] storage Worker 이름 결정
 - [ ] 같은 이름의 storage Worker를 대시보드에서 한 번 생성
@@ -69,8 +68,8 @@ Variables:
 
 - [ ] `CF_ACCOUNT_ID`
 - [ ] `STORAGE_WORKER_NAME`
-- [ ] `VPC_SERVICE_ID`: 선택한 `8086` 또는 `8087` Service ID
-- [ ] `ORIGIN_BASE_URL`: 선택한 origin의 내부 URL
+- [ ] `VPC_SERVICE_ID`: Node `8086` Service ID
+- [ ] `ORIGIN_BASE_URL`: Node origin의 내부 URL
 
 `VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`은 같은 origin을 가리켜야 합니다.
 

@@ -12,7 +12,7 @@ Cloudflare Tunnel을 통해서만 원본 서버에 접근하며, 성공 응답�
 ```text
 브라우저
 ├─ app.example.com  ─ Google 인증 ─ web Worker ─ D1
-└─ img.example.com  ─ 공개 ─ image Worker ─ Workers VPC ─ Tunnel ─ 선택한 origin
+└─ img.example.com  ─ 공개 ─ image Worker ─ Workers VPC ─ Tunnel ─ Node origin
                               └─ Cloudflare edge cache
 ```
 
@@ -31,11 +31,10 @@ Cloudflare Tunnel을 통해서만 원본 서버에 접근하며, 성공 응답�
 2. [전체 설치 순서](docs/installation.md)
 3. [D1, Workers VPC, Tunnel과 Worker 설정](docs/cloudflare.md)
 4. [Node.js origin 서비스 설치](docs/origin.md)
-5. [.NET 10 origin 서비스](docs/origin-dotnet.md)
-6. [GitHub Actions 변수·비밀 및 격리 정책](docs/github-actions.md)
-7. [Google OAuth 설정](docs/google-oauth.md)
-8. [캐시, 삭제와 복구 동작](docs/operations.md)
-9. [운영 설정 체크리스트](docs/setup-checklist.md)
+5. [GitHub Actions 변수·비밀 및 격리 정책](docs/github-actions.md)
+6. [Google OAuth 설정](docs/google-oauth.md)
+7. [캐시, 삭제와 복구 동작](docs/operations.md)
+8. [운영 설정 체크리스트](docs/setup-checklist.md)
 
 실제 계정 ID, 데이터베이스 ID, VPC Service ID, 도메인, 토큰 및 Tunnel 토큰은
 저장소에 커밋하지 않습니다. 예시의 `<...>` 값은 Cloudflare 대시보드나 GitHub
@@ -48,14 +47,8 @@ Environment에서 설정해야 합니다.
 | `workers/web` | Google 인증 웹 UI와 D1 API Worker |
 | `workers/storage` | 공개 이미지·VPC gateway Worker |
 | `origin` | Node.js 이미지 저장 서비스, 기본 포트 8086 |
-| `origin-dotnet` | 동일 계약의 .NET 10 이미지 저장 서비스, 기본 포트 8087 |
 | `database/d1/migrations` | D1 스키마 |
 | `.github/workflows` | 대상별 독립 CI/CD |
 
 각 Worker는 별도 lockfile과 GitHub Environment를 사용합니다. Worker 배포는 다른
 Worker, D1 migration 또는 Linux 서버의 파일을 변경하지 않습니다.
-
-두 origin은 동시에 실행할 수 있지만 storage Worker는 한 번에 하나의 VPC Service만
-바인딩합니다. 구현 전환에는 Worker 코드 변경이 필요하지 않지만
-`VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`을 함께 바꾸고, 새 origin에 기존 active·trash
-데이터가 동일하게 준비되어 있어야 합니다.

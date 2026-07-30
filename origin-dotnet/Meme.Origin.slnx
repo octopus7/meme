@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="src/Meme.Origin/Meme.Origin.csproj" />
-  <Project Path="test/Meme.Origin.Tests/Meme.Origin.Tests.csproj" />
-</Solution>

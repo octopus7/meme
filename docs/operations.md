@@ -12,9 +12,6 @@ rebuild합니다.
 - read-only filesystem, capability drop, `no-new-privileges`가 유지되는지 확인합니다.
 - Container Manager health와 restart 횟수를 감시합니다.
 
-동일 계약의 .NET 10 origin은 8087에서 함께 실행할 수 있으며 storage Worker는
-선택한 VPC Service binding과 `ORIGIN_BASE_URL`을 사용합니다.
-
 ## 캐시
 
 이미지 URL은 파일 내용의 SHA-256으로 결정되므로 active 상태에서는 immutable

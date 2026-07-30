@@ -102,8 +102,8 @@ sh /tmp/install-meme-origin.sh
 Container Manager 파일과 Linux x64 애플리케이션 의존성이 포함되지만 실제
 환경 파일이나 token은 없습니다.
 
-이 workflow는 artifact만 생성하며 NAS에 접속하거나 서버, Worker, D1 또는
-`.NET origin`을 변경하지 않습니다. 비컨테이너 systemd 설치가 꼭 필요한 경우에는
+이 workflow는 artifact만 생성하며 NAS에 접속하거나 서버, Worker 또는 D1을
+변경하지 않습니다. 비컨테이너 systemd 설치가 꼭 필요한 경우에는
 [origin README](../origin/README.md)의 fallback 절차를 사용하되 Synology에서는
 Container Manager를 우선합니다.
 
