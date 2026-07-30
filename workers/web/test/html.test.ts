@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UPLOAD_JS } from "../src/assets";
-import { assetScript, escapeHtml, highlight, html, uploadForm } from "../src/html";
+import { allLink, assetScript, escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
@@ -16,7 +16,7 @@ describe("HTML helpers", () => {
     expect(searchTerms(" a  a b ")).toEqual(["a", "b"]);
   });
 
-  it("adds deployment information to every HTML page", async () => {
+  it("adds deployment information by default", async () => {
     const response = html("<main>content</main>");
     const body = await response.text();
 
@@ -25,10 +25,19 @@ describe("HTML helpers", () => {
     expect(body).toContain('href="/assets/app.css?v=development"');
   });
 
+  it("can omit deployment information and renders an accessible list icon", async () => {
+    const response = html(`<main>${allLink()}</main>`, 200, false);
+    const body = await response.text();
+
+    expect(body).not.toContain('id="deployment-info"');
+    expect(body).not.toContain("/assets/deployment.js");
+    expect(body).toContain('<a href="/all" aria-label="전체 목록" title="전체 목록">📋</a>');
+  });
+
   it("renders a collapsed upload form with a visible description label", () => {
     const markup = uploadForm(true);
 
-    expect(markup).toContain("<details>");
+    expect(markup).toContain('<details class="upload-panel">');
     expect(markup).not.toContain("<details open");
     expect(markup).toContain("<summary>upload</summary>");
     expect(markup).toContain('<label>설명 <input name="description"');

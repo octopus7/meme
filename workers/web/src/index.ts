@@ -2,7 +2,7 @@ import { ALL_JS, APP_CSS, DEPLOYMENT_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
 import { authenticate } from "./auth";
 import { addItem, encodeCursor, list, search, searchTerms, type ImageRow } from "./db";
 import deploymentInfo from "./deployment-info.generated.json";
-import { assetScript, escapeHtml, highlight, html, textBytes, uploadForm } from "./html";
+import { allLink, assetScript, escapeHtml, highlight, html, textBytes, uploadForm } from "./html";
 import type { StoredBlob } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" };
@@ -19,8 +19,8 @@ function imageMarkup(row: ImageRow, env: Env, terms: string[] = [], deletable = 
   const hash = encodeURIComponent(row.blob_hash);
   const ext = encodeURIComponent(row.extension);
   const origin = escapeHtml(imageOrigin(env));
-  const remove = deletable ? `<button type="button" data-delete="${escapeHtml(row.id)}">delete</button>` : "";
-  return `<article><a href="${origin}/i/${hash}.${ext}"><img src="${origin}/t/${hash}" width="128" height="128" loading="lazy" alt=""></a><p>${highlight(row.description, terms)}</p>${remove}</article>`;
+  const remove = deletable ? `<button class="delete-button" type="button" data-delete="${escapeHtml(row.id)}">삭제</button>` : "";
+  return `<article class="meme-card"><a class="meme-image" href="${origin}/i/${hash}.${ext}"><img src="${origin}/t/${hash}" width="320" height="320" loading="lazy" alt=""></a><div class="meme-card-body"><p class="meme-description">${highlight(row.description, terms)}</p>${remove}</div></article>`;
 }
 
 function sameOrigin(request: Request): boolean {
@@ -153,7 +153,7 @@ async function route(request: Request, env: Env): Promise<Response> {
     return new Response(JSON.stringify(deploymentInfo), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
   if (request.method === "GET" && url.pathname === "/search") {
-    return html(`<main><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p><a href="/all">all</a></p><div id="results"></div></main>${assetScript("/assets/search.js")}`);
+    return html(`<main><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p>${allLink()}</p><div id="results"></div></main>${assetScript("/assets/search.js")}`, 200, false);
   }
   if (request.method === "GET" && url.pathname === "/api/search") {
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 200);
@@ -171,11 +171,14 @@ async function route(request: Request, env: Env): Promise<Response> {
     }
     const hasMore = rows.length > 50;
     const visible = rows.slice(0, 50);
-    const next = hasMore && visible.length ? `<p><a href="/all?cursor=${encodeURIComponent(encodeCursor(visible[visible.length - 1]!))}">next</a></p>` : "";
-    return html(`<nav><a href="/search">search</a></nav><main>${uploadForm(true)}${visible.map((row) => imageMarkup(row, env, [], true)).join("")}${next}</main>${assetScript("/assets/upload.js")}${assetScript("/assets/all.js")}`);
+    const next = hasMore && visible.length ? `<p class="next-page"><a href="/all?cursor=${encodeURIComponent(encodeCursor(visible[visible.length - 1]!))}">다음</a></p>` : "";
+    const gallery = visible.length
+      ? visible.map((row) => imageMarkup(row, env, [], true)).join("")
+      : `<p class="empty-state">아직 등록된 이미지가 없습니다.</p>`;
+    return html(`<div class="all-shell"><header class="all-toolbar"><a class="brand" href="/all">meme</a><nav class="toolbar-actions" aria-label="주요 메뉴"><a class="toolbar-link" href="/search">🔎 검색</a><a class="logout-button" href="/auth/logout">로그아웃</a></nav></header><main class="all-page">${uploadForm(true)}<section class="gallery" aria-label="이미지 목록">${gallery}</section>${next}</main></div>${assetScript("/assets/upload.js")}${assetScript("/assets/all.js")}`);
   }
   if (request.method === "GET" && url.pathname === "/upload") {
-    return html(`<nav><a href="/search">search</a> <a href="/all">all</a></nav><main>${uploadForm()}</main>${assetScript("/assets/upload.js")}`);
+    return html(`<nav><a href="/search">search</a> ${allLink()}</nav><main>${uploadForm()}</main>${assetScript("/assets/upload.js")}`);
   }
   if (request.method === "POST" && url.pathname === "/api/images") return upload(request, env);
   const match = /^\/api\/images\/([0-9a-f-]{36})$/u.exec(url.pathname);

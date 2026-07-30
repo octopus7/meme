@@ -7,6 +7,10 @@ export function assetScript(path: string): string {
   return `<script src="${path}?v=${assetVersion}" defer></script>`;
 }
 
+export function allLink(): string {
+  return `<a href="/all" aria-label="전체 목록" title="전체 목록">📋</a>`;
+}
+
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
     "&": "&amp;",
@@ -17,8 +21,11 @@ export function escapeHtml(value: string): string {
   })[char] ?? char);
 }
 
-export function html(body: string, status = 200): Response {
-  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><link rel="stylesheet" href="/assets/app.css?v=${assetVersion}"><body>${body}<footer><small id="deployment-info">배포 정보 확인 중…</small></footer>${assetScript("/assets/deployment.js")}</body></html>`, {
+export function html(body: string, status = 200, showDeploymentInfo = true): Response {
+  const deploymentTail = showDeploymentInfo
+    ? `<footer><small id="deployment-info">배포 정보 확인 중…</small></footer>${assetScript("/assets/deployment.js")}`
+    : "";
+  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><link rel="stylesheet" href="/assets/app.css?v=${assetVersion}"><body>${body}${deploymentTail}</body></html>`, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -32,7 +39,7 @@ export function html(body: string, status = 200): Response {
 
 export function uploadForm(collapsible = false): string {
   const content = `<form id="upload-form"><p><label>이미지 <input name="image" type="file" accept="image/*" required></label></p><p><label>설명 <input name="description" maxlength="500" required></label></p><button>upload</button></form><pre id="upload-console" class="upload-console" role="log" aria-live="polite" aria-label="업로드 과정 로그"></pre>`;
-  return collapsible ? `<details><summary>upload</summary>${content}</details>` : content;
+  return collapsible ? `<details class="upload-panel"><summary>upload</summary>${content}</details>` : content;
 }
 
 export function textBytes(value: string): number {
