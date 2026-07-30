@@ -51,7 +51,7 @@ Variables:
 - [ ] `IMAGE_ORIGIN=https://<IMAGE_DOMAIN>`
 - [ ] `GOOGLE_CLIENT_ID`
 - [ ] `GOOGLE_REDIRECT_URI=https://<APP_DOMAIN>/auth/callback`
-- [ ] `GOOGLE_ALLOWED_EMAILS`
+- [ ] `GOOGLE_ALLOWED_EMAILS=<관리자 이메일 하나>`
 
 Cloudflare web Worker encrypted secrets:
 
@@ -68,6 +68,8 @@ Variables:
 
 - [ ] `CF_ACCOUNT_ID`
 - [ ] `STORAGE_WORKER_NAME`
+- [ ] `D1_DATABASE_NAME`
+- [ ] `D1_DATABASE_ID`
 - [ ] `VPC_SERVICE_ID`: Node `8086` Service ID
 - [ ] `ORIGIN_BASE_URL`: Node origin의 내부 URL
 
@@ -88,11 +90,13 @@ Variables:
 ## 4. 배포 순서
 
 - [ ] `ORIGIN_ADMIN_TOKEN`과 origin mutation token 일치 확인
+- [ ] `Migrate D1`
 - [ ] `Deploy storage Worker`
 - [ ] storage Custom Domain 연결
-- [ ] `Migrate D1`
 - [ ] `Deploy web Worker`
 - [ ] web Custom Domain 연결
 - [ ] 인증 없는 브라우저가 Google 인증 화면으로 이동하는지 확인
-- [ ] 허용 계정으로 web 화면, 업로드, 검색, 캐시 HIT, 삭제 후 404 확인
-- [ ] 허용목록 밖의 Google 계정이 차단되는지 확인
+- [ ] 관리자 계정으로 web 화면, 업로드, 검색, 캐시 HIT, 삭제 후 404 확인
+- [ ] 관리자 화면에서 외부 회원 ON/OFF와 즉시 차단 확인
+- [ ] 일반 회원에게 관리자 톱니가 없고 `/admin`, `/logs`가 404인지 확인
+- [ ] 관리자 통계에서 요청 목록, 구간 조회, 파일별 HIT율 확인

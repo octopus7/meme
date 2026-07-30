@@ -10,7 +10,7 @@ flowchart LR
     U["브라우저"]
     subgraph CF["Cloudflare"]
         W["Google 인증 web Worker<br/>/ → /search<br/>/search · /all · 업로드 · 삭제"]
-        D[("D1<br/>blob · 항목 참조 · 설명 · 원래 파일명")]
+        D[("D1<br/>이미지 메타데이터 · 접근 설정<br/>90일 요청·캐시 로그")]
 
         subgraph S["공개 storage Worker"]
             R["기본 라우터<br/>GET/HEAD · 경로 정규화<br/>캐시하지 않음"]
@@ -44,9 +44,10 @@ flowchart LR
     X -->|"30일 만료 purge"| P["물리 삭제"]
 ```
 
-`web Worker`는 Google OpenID Connect 로그인을 요구합니다. 유효한 서명 세션이
-없으면 Google 인증 화면으로 이동하며, 검증된 이메일이 운영 허용목록에 포함된
-경우에만 `/search`, `/all`, 업로드와 삭제 API를 사용할 수 있습니다.
+`web Worker`는 Google OpenID Connect 로그인을 요구합니다. 환경 변수에는 관리자
+이메일 하나만 두고, 일반 Google 회원의 로그인 허용 여부는 D1 설정으로 관리합니다.
+일반 회원에게는 관리자와 통계 경로를 노출하지 않으며 직접 접근도 404입니다.
+삭제, 회원 접근 설정과 요청 통계 조회는 관리자에게만 허용합니다.
 
 반대로 `storage Worker`의 기본 라우트는 공개입니다. `/i/{sha256}.{ext}`와
 `/t/{sha256}` 주소를 아는 사용자는 인증 없이 파일을 읽을 수 있습니다. origin 관리
@@ -80,7 +81,8 @@ flowchart TD
 
 캐시 HIT이면 VPC, Tunnel, Linux 장비로 트래픽이 발생하지 않습니다. 정상 응답만
 해시 기반 키로 장기 엣지 캐시하고 404와 장애 응답은 저장하지 않습니다. 원본과
-썸네일에는 같은 `blob-{sha256}` 캐시 태그를 사용합니다.
+썸네일에는 같은 `blob-{sha256}` 캐시 태그를 사용합니다. 공개 storage gateway는
+각 요청의 `Cf-Cache-Status`, hash, 유형, 응답 상태와 POP을 D1에 비동기로 기록합니다.
 
 ## 업로드와 삭제
 

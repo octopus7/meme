@@ -1,8 +1,9 @@
 # Google OAuth setup
 
-The web Worker uses Google OpenID Connect. Requests without a valid signed
-session cookie are redirected to Google. Only verified accounts listed in
-`GOOGLE_ALLOWED_EMAILS` can create a session.
+The web Worker uses Google OpenID Connect. `GOOGLE_ALLOWED_EMAILS` contains
+exactly one verified administrator email. The administrator can enable or
+disable login for all other verified Google accounts from the private admin
+page.
 
 ## Google Cloud
 
@@ -37,7 +38,10 @@ GOOGLE_REDIRECT_URI=https://meme-web.bgue.workers.dev/auth/callback
 GOOGLE_ALLOWED_EMAILS=owner@example.com
 ```
 
-Multiple allowed accounts are comma-separated.
+Do not use a comma-separated list. This variable accepts exactly one
+administrator email. The administrator is always allowed. External member
+access defaults to disabled and can be changed from the gear link shown only
+to the administrator on `/all`.
 
 ## Cloudflare Worker secrets
 

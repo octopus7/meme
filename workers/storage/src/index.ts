@@ -6,6 +6,7 @@ import {
   parseMediaPath,
   publicMediaResponse,
 } from "./media";
+import { writeMediaRequestLog } from "./request-log";
 
 const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const FORWARDED_UPLOAD_HEADERS = [
@@ -139,7 +140,7 @@ export class Admin extends WorkerEntrypoint<Env> {
 }
 
 export default {
-  async fetch(request, _env, ctx): Promise<Response> {
+  async fetch(request, env, ctx): Promise<Response> {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return plain(405, "method not allowed");
     }
@@ -147,6 +148,16 @@ export default {
     const target = parseMediaPath(new URL(request.url).pathname);
     if (!target) return plain(404, "not found");
 
-    return ctx.exports.Media.fetch(canonicalMediaRequest(request, target));
+    const response = await ctx.exports.Media.fetch(canonicalMediaRequest(request, target));
+    ctx.waitUntil(
+      writeMediaRequestLog(env, request, target, response).catch((error: unknown) => {
+        console.error(JSON.stringify({
+          event: "media_request_log_failed",
+          path: target.path,
+          error: error instanceof Error ? error.message : "unknown",
+        }));
+      }),
+    );
+    return response;
   },
 } satisfies ExportedHandler<Env>;

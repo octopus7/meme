@@ -7,6 +7,10 @@ export function assetScript(path: string): string {
   return `<script src="${path}?v=${assetVersion}" defer></script>`;
 }
 
+export function assetStyle(path: string): string {
+  return `<link rel="stylesheet" href="${path}?v=${assetVersion}">`;
+}
+
 export function allLink(): string {
   return `<a href="/all" aria-label="전체 목록" title="전체 목록">📋</a>`;
 }

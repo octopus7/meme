@@ -11,6 +11,30 @@ export interface ImageRow {
   created_at: string;
 }
 
+export interface MediaRequestLogRow {
+  id: number;
+  requested_at: number;
+  blob_hash: string;
+  media_kind: "original" | "thumbnail";
+  request_method: "GET" | "HEAD";
+  cache_status: string;
+  response_status: number;
+  colo: string | null;
+  extension: string | null;
+  description: string | null;
+}
+
+export interface MediaFileStatsRow {
+  blob_hash: string;
+  extension: string | null;
+  description: string | null;
+  total_requests: number;
+  cache_hits: number;
+  cache_misses: number;
+  cache_other: number;
+  response_errors: number;
+}
+
 export function searchTerms(query: string): string[] {
   return [...new Set(query.trim().split(/\s+/u).filter(Boolean))].slice(0, 8);
 }
@@ -73,6 +97,89 @@ export async function list(env: Env, cursor: string | null, limit: number): Prom
 export function encodeCursor(row: ImageRow): string {
   return btoa(JSON.stringify({ createdAt: row.created_at, id: row.id }))
     .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+export async function mediaRequestLogs(
+  env: Env,
+  from: number,
+  to: number,
+  beforeAt: number | null,
+  beforeId: number | null,
+  limit: number,
+): Promise<MediaRequestLogRow[]> {
+  const hasCursor = beforeAt !== null && beforeId !== null;
+  const before = hasCursor
+    ? "AND (l.requested_at < ? OR (l.requested_at = ? AND l.id < ?))"
+    : "";
+  const values = hasCursor
+    ? [from, to, beforeAt, beforeAt, beforeId, limit]
+    : [from, to, limit];
+  const result = await env.DB.prepare(
+    `SELECT l.id, l.requested_at, l.blob_hash, l.media_kind, l.request_method,
+            l.cache_status, l.response_status, l.colo, b.extension,
+            (SELECT i.description FROM image_items i
+             WHERE i.blob_hash=l.blob_hash
+             ORDER BY i.created_at, i.id LIMIT 1) AS description
+     FROM media_request_logs l
+     LEFT JOIN blobs b ON b.hash=l.blob_hash
+     WHERE l.requested_at >= ? AND l.requested_at < ? ${before}
+     ORDER BY l.requested_at DESC, l.id DESC
+     LIMIT ?`,
+  ).bind(...values).all<MediaRequestLogRow>();
+  return result.results;
+}
+
+export async function mediaFileStats(
+  env: Env,
+  from: number,
+  to: number,
+): Promise<MediaFileStatsRow[]> {
+  const result = await env.DB.prepare(
+    `SELECT l.blob_hash, b.extension,
+            (SELECT i.description FROM image_items i
+             WHERE i.blob_hash=l.blob_hash
+             ORDER BY i.created_at, i.id LIMIT 1) AS description,
+            COUNT(*) AS total_requests,
+            SUM(CASE WHEN l.cache_status='HIT' THEN 1 ELSE 0 END) AS cache_hits,
+            SUM(CASE WHEN l.cache_status='MISS' THEN 1 ELSE 0 END) AS cache_misses,
+            SUM(CASE WHEN l.cache_status NOT IN ('HIT', 'MISS') THEN 1 ELSE 0 END) AS cache_other,
+            SUM(CASE WHEN l.response_status >= 400 THEN 1 ELSE 0 END) AS response_errors
+     FROM media_request_logs l
+     LEFT JOIN blobs b ON b.hash=l.blob_hash
+     WHERE l.requested_at >= ? AND l.requested_at < ?
+     GROUP BY l.blob_hash, b.extension
+     ORDER BY total_requests DESC, l.blob_hash`,
+  ).bind(from, to).all<MediaFileStatsRow>();
+  return result.results;
+}
+
+export async function purgeExpiredMediaRequestLogs(env: Env): Promise<void> {
+  await env.DB.prepare(
+    `DELETE FROM media_request_logs
+     WHERE id IN (
+       SELECT id FROM media_request_logs
+       WHERE requested_at < unixepoch() - ?
+       ORDER BY requested_at
+       LIMIT 10000
+     )`,
+  ).bind(90 * 24 * 60 * 60).run();
+}
+
+export async function externalMembersAllowed(env: Env): Promise<boolean> {
+  const row = await env.DB.prepare(
+    "SELECT value FROM app_settings WHERE key='allow_external_members'",
+  ).first<{ value: string }>();
+  return row?.value === "true";
+}
+
+export async function setExternalMembersAllowed(env: Env, allowed: boolean): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO app_settings(key, value)
+     VALUES('allow_external_members', ?)
+     ON CONFLICT(key) DO UPDATE SET
+       value=excluded.value,
+       updated_at=strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+  ).bind(allowed ? "true" : "false").run();
 }
 
 function decodeCursor(cursor: string): { createdAt: string; id: string } {

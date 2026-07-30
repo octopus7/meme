@@ -23,7 +23,8 @@ item: 내부 소유자 식별값, blob hash, 설명, 원래 파일명, 생성/�
 npx wrangler@latest d1 create <D1_DATABASE_NAME>
 ```
 
-반환된 ID를 `web-production` Environment의 `D1_DATABASE_ID`에 저장합니다.
+반환된 이름과 ID를 `web-production`, `storage-production`, `d1-production`
+Environment의 `D1_DATABASE_NAME`, `D1_DATABASE_ID`에 동일하게 저장합니다.
 
 ## Workers VPC와 Tunnel
 

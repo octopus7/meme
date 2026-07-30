@@ -62,16 +62,17 @@ Cloudflare 대시보드 또는 로컬에서 인증한 Wrangler로 D1 데이터�
 npx wrangler@latest d1 create <D1_DATABASE_NAME>
 ```
 
-데이터베이스 이름과 ID를 GitHub `web-production` Environment 변수에 등록하고,
+데이터베이스 이름과 ID를 GitHub `web-production`, `storage-production`
+Environment 변수에 등록하고,
 [D1 migration 워크플로](github-actions.md#d1-migration)를 수동 실행합니다.
 
 ## 4. Worker 최초 배포
 
 GitHub Actions에서 다음 순서로 실행합니다.
 
-1. `Deploy storage Worker`
-2. Cloudflare 대시보드에서 storage Worker에 `img.example.com` Custom Domain 연결
-3. `Migrate D1`
+1. `Migrate D1`
+2. `Deploy storage Worker`
+3. Cloudflare 대시보드에서 storage Worker에 `img.example.com` Custom Domain 연결
 4. `Deploy web Worker`
 5. Cloudflare 대시보드에서 web Worker에 `app.example.com` Custom Domain 연결
 
@@ -87,14 +88,16 @@ Worker secret을 먼저 설정합니다.
 ## 6. 점검
 
 - 비공개 브라우저 창에서 `app.example.com`을 열면 Google 인증 화면으로 이동한다.
-- 허용된 Google 계정으로 로그인한 뒤 `/`가 `/search`로 이동한다.
-- 허용목록에 없는 Google 계정은 세션을 만들 수 없다.
+- 관리자 Google 계정으로 로그인한 뒤 `/`가 `/search`로 이동한다.
+- 관리자 화면에서 외부 회원을 차단하면 일반 Google 계정은 세션을 사용할 수 없다.
+- 일반 회원의 `/all`에는 관리자 톱니가 없고 `/admin`, `/logs`는 404다.
 - `/search`의 빈 입력은 이미지 요청이나 검색 API 호출을 만들지 않는다.
 - 검색 입력 중 결과가 최대 5개만 나타난다.
 - `/all`은 전체 항목을 표시한다.
 - 같은 파일을 두 번 올려도 origin의 원본 파일 수가 늘지 않는다.
 - `img.example.com/i/...`와 `/t/...`는 인증 없이 열리고 `HEAD`가 동작한다.
 - 두 번째 이미지 요청의 `Cf-Cache-Status`가 `HIT`이며 origin access log가 늘지 않는다.
+- 관리자 통계에서 요청 목록과 지정 구간의 파일별 HIT율이 표시된다.
 - 마지막 참조 삭제 및 purge 완료 후 두 이미지 URL이 404가 된다.
 
 실서비스 전에는 업로드 중 장애, D1 실패, Tunnel 중단, 디스크 부족과 30일 purge를

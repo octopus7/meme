@@ -6,6 +6,41 @@ export const ALL_JS = `(()=>{document.addEventListener("click",async e=>{const b
 
 export const DEPLOYMENT_JS = `(()=>{const e=document.getElementById("deployment-info");if(!e)return;fetch("/assets/deployment-info.json",{cache:"no-store",headers:{accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("deployment metadata unavailable");return r.json()}).then(v=>{if(typeof v.deployedAt!=="string"||typeof v.commitSha!=="string")throw new Error("invalid deployment metadata");const d=new Date(v.deployedAt);if(Number.isNaN(d.getTime()))throw new Error("invalid deployment time");const z=Intl.DateTimeFormat().resolvedOptions().timeZone||"local";const t=new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"medium"}).format(d);const s=v.commitSha.slice(0,7);e.textContent="배포: "+t+" ("+z+") · commit "+s;e.title="배포 시각(UTC): "+v.deployedAt+"\\ncommit: "+v.commitSha}).catch(()=>{e.textContent="배포 정보를 확인할 수 없습니다"})})();`;
 
+export const LOGS_JS = `(()=>{const pad=n=>String(n).padStart(2,"0"),localValue=s=>{const d=new Date(Number(s)*1000);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes())};document.querySelectorAll("time[data-epoch]").forEach(e=>{const d=new Date(Number(e.dataset.epoch)*1000);if(!Number.isNaN(d.getTime())){e.textContent=new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"medium"}).format(d);e.title=d.toISOString()}});const f=document.getElementById("log-filter");if(!f)return;const from=f.querySelector("#log-from"),to=f.querySelector("#log-to"),fromEpoch=f.querySelector("input[name=from]"),toEpoch=f.querySelector("input[name=to]");from.value=localValue(fromEpoch.value);to.value=localValue(toEpoch.value);f.addEventListener("submit",e=>{const a=new Date(from.value),b=new Date(to.value);if(Number.isNaN(a.getTime())||Number.isNaN(b.getTime())||a>=b){e.preventDefault();alert("올바른 조회 구간을 지정하세요.");return}fromEpoch.value=String(Math.floor(a.getTime()/1000));toEpoch.value=String(Math.floor(b.getTime()/1000))})})();`;
+
+export const ADMIN_CSS = `
+.logs-page{box-sizing:border-box;width:min(1400px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
+.logs-page h1{margin:.2rem 0 1rem;letter-spacing:-.04em}
+.log-filter{display:flex;align-items:end;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem;padding:1rem;border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07)}
+.log-filter label{display:grid;gap:.35rem;color:#4b5568;font-size:.82rem;font-weight:700}
+.log-filter input{min-height:2.4rem;padding:0 .6rem;border:1px solid #cfd6e3;border-radius:8px;color:#172033}
+.log-filter button{min-height:2.4rem;padding:0 1rem;border:0;border-radius:8px;background:#3157c8;color:#fff;font-weight:750;cursor:pointer}
+.range-links{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1.5rem}
+.range-links a{padding:.38rem .65rem;border-radius:999px;background:#eef2ff;text-decoration:none}
+.log-section{margin:0 0 1.5rem;padding:1rem;border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07)}
+.log-section h2{margin:0 0 .85rem;font-size:1.1rem}
+.table-scroll{overflow:auto}
+.log-table{width:100%;border-collapse:collapse;font-size:.88rem;white-space:nowrap}
+.log-table th,.log-table td{padding:.65rem .7rem;border-bottom:1px solid #edf0f5;text-align:left}
+.log-table th{position:sticky;top:0;background:#f8faff;color:#4b5568;font-size:.76rem;letter-spacing:.03em;text-transform:uppercase}
+.log-table tbody tr:last-child td{border-bottom:0}
+.log-description{max-width:24rem;overflow:hidden;text-overflow:ellipsis}
+.hash-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.cache-badge{display:inline-flex;min-width:3.4rem;justify-content:center;padding:.2rem .45rem;border-radius:999px;background:#eef1f6;font-size:.75rem;font-weight:800}
+.cache-hit{background:#e9f8ef;color:#167246}.cache-miss{background:#fff4df;color:#9a5b00}.cache-bypass,.cache-unknown{background:#fff0f1;color:#a52b35}
+.hit-rate{font-variant-numeric:tabular-nums;font-weight:800}
+.admin-page{box-sizing:border-box;width:min(900px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
+.admin-page h1{margin:.2rem 0 1rem;letter-spacing:-.04em}
+.admin-card{margin:0 0 1rem;padding:clamp(1rem,3vw,1.5rem);border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07)}
+.admin-card h2{margin:0 0 .55rem}
+.admin-card p{color:#596579;line-height:1.6}
+.primary-link{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .9rem;border-radius:9px;background:#3157c8;color:#fff;font-weight:750;text-decoration:none}
+.member-setting{display:flex;align-items:center;flex-wrap:wrap;gap:.8rem;margin-top:1rem;padding:1rem;border-radius:10px;background:#f8faff}
+.member-setting label{font-weight:700}
+.member-setting button{min-height:2.4rem;padding:0 .9rem;border:0;border-radius:8px;background:#3157c8;color:#fff;font-weight:750;cursor:pointer}
+@media(max-width:560px){.logs-page{padding:1rem}.log-filter label{width:100%}.log-filter input{box-sizing:border-box;width:100%}}
+`;
+
 export const APP_CSS = `
 :root{color-scheme:light;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}
 body{margin:0}
@@ -16,6 +51,7 @@ a{color:#3157c8}
 .toolbar-actions{display:flex;align-items:center;gap:.6rem}
 .toolbar-link,.logout-button{display:inline-flex;align-items:center;justify-content:center;min-height:2.25rem;padding:0 .85rem;border-radius:999px;text-decoration:none}
 .toolbar-link{background:#eef2ff;color:#2f50ba}
+.icon-link{display:inline-flex;width:2.35rem;height:2.35rem;align-items:center;justify-content:center;border-radius:999px;background:#172033;color:#fff;font-size:1.05rem;text-decoration:none}
 .logout-button{border:1px solid #f0c9cd;background:#fff5f5;color:#b4232f;font-weight:700}
 .all-page{box-sizing:border-box;width:min(1180px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
 .upload-panel{margin-bottom:1.5rem;border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07);overflow:hidden}
@@ -50,5 +86,5 @@ a{color:#3157c8}
 .upload-console{box-sizing:border-box;width:100%;min-height:8rem;max-height:20rem;overflow:auto;margin:.75rem 0;padding:.75rem;border:1px solid #30363d;border-radius:8px;background:#0d1117;color:#c9d1d9;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 .upload-console:empty::before{content:"업로드 로그 대기 중";color:#8b949e}
 footer{box-sizing:border-box;width:min(1180px,100%);margin:1rem auto 0;padding:0 clamp(1rem,4vw,2.5rem) 1.5rem;color:#667085}
-@media(max-width:560px){.toolbar-link,.logout-button{padding:0 .65rem}.all-page{padding:1rem}.gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.meme-card-body{align-items:flex-start;flex-direction:column}.delete-button{width:100%}}
+@media(max-width:560px){.toolbar-actions{gap:.3rem}.toolbar-link,.logout-button{padding:0 .55rem;font-size:.82rem}.all-page{padding:1rem}.gallery{grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}.meme-card-body{align-items:flex-start;flex-direction:column}.delete-button{width:100%}}
 `;

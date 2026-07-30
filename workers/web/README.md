@@ -21,8 +21,9 @@ CI는 GitHub Environment 변수로 아래 값을 제공한 뒤
 `CLOUDFLARE_API_TOKEN`은 GitHub Environment secret으로, `CF_ACCOUNT_ID`는
 Environment variable로 관리합니다. `GOOGLE_CLIENT_SECRET`과
 `AUTH_SESSION_SECRET`은 web Worker의 encrypted secret으로 직접 등록합니다.
-웹 화면과 API는 유효한 Google 로그인 세션과 허용 이메일이 있어야 접근할 수
-있습니다. 자세한 발급 및 URL 설정은 `docs/google-oauth.md`를 참고합니다.
+`GOOGLE_ALLOWED_EMAILS`에는 관리자 이메일 하나만 설정합니다. 관리자는 항상
+접근할 수 있고 관리자 화면에서 일반 Google 회원의 접근 허용 여부를 전역으로
+설정합니다. 자세한 발급 및 URL 설정은 `docs/google-oauth.md`를 참고합니다.
 
 `STORAGE_ADMIN` 서비스 바인딩 계약은 다음과 같습니다.
 
@@ -32,8 +33,9 @@ Environment variable로 관리합니다. `GOOGLE_CLIENT_SECRET`과
   휴지통으로 옮기고 해당 엣지 캐시를 퍼지합니다.
 
 최초 배포 전에 별도 권한의 D1 migration workflow로
-`database/d1/migrations/0001_initial.sql`을 적용합니다. 10분 주기의 cron은 마지막
-D1 참조 삭제 후 실패한 휴지통 이동을 재시도합니다.
+`database/d1/migrations`의 migration을 모두 적용합니다. 10분 주기의 cron은 마지막
+D1 참조 삭제 후 실패한 휴지통 이동을 재시도하고 90일이 지난 요청 로그를 최대
+10,000개씩 정리합니다.
 
 ## 로컬 검사
 

@@ -45,6 +45,14 @@ const config = {
   secrets: {
     required: ["ORIGIN_ADMIN_TOKEN"],
   },
+  d1_databases: [
+    {
+      binding: "DB",
+      database_name: required("D1_DATABASE_NAME"),
+      database_id: required("D1_DATABASE_ID"),
+      migrations_dir: "../../database/d1/migrations",
+    },
+  ],
 };
 
 writeFileSync(output, `${JSON.stringify(config, null, 2)}\n`, {

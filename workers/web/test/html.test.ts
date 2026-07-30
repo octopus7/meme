@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { UPLOAD_JS } from "../src/assets";
-import { allLink, assetScript, escapeHtml, highlight, html, uploadForm } from "../src/html";
+import { LOGS_JS, UPLOAD_JS } from "../src/assets";
+import { allLink, assetScript, assetStyle, escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
@@ -23,6 +23,7 @@ describe("HTML helpers", () => {
     expect(body).toContain('id="deployment-info"');
     expect(body).toContain('src="/assets/deployment.js?v=development"');
     expect(body).toContain('href="/assets/app.css?v=development"');
+    expect(assetStyle("/assets/admin.css")).toBe('<link rel="stylesheet" href="/assets/admin.css?v=development">');
   });
 
   it("can omit deployment information and renders an accessible list icon", async () => {
@@ -54,5 +55,11 @@ describe("HTML helpers", () => {
     expect(UPLOAD_JS).toContain("await r.text()");
     expect(UPLOAD_JS).toContain('log("ERROR"');
     expect(UPLOAD_JS).toContain('log("DONE"');
+  });
+
+  it("formats log times in the browser timezone and submits epoch ranges", () => {
+    expect(() => new Function(LOGS_JS)).not.toThrow();
+    expect(LOGS_JS).toContain("Intl.DateTimeFormat");
+    expect(LOGS_JS).toContain("Math.floor(a.getTime()/1000)");
   });
 });

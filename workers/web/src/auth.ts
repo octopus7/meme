@@ -22,10 +22,15 @@ interface OAuthTransaction {
   exp: number;
 }
 
-interface SessionClaims {
+export interface SessionClaims {
   sub: string;
   email: string;
   exp: number;
+}
+
+export interface AuthenticationResult {
+  session: SessionClaims | null;
+  response: Response | null;
 }
 
 interface JwtHeader {
@@ -177,8 +182,24 @@ function configuredRedirectUri(request: Request, env: Env): string {
   return redirectUri.toString();
 }
 
-function allowedEmails(env: Env): Set<string> {
-  return new Set(env.GOOGLE_ALLOWED_EMAILS.split(",").map((email) => email.trim().toLocaleLowerCase()).filter(Boolean));
+export function configuredAdminEmail(env: { GOOGLE_ALLOWED_EMAILS: string }): string {
+  const email = env.GOOGLE_ALLOWED_EMAILS.trim().toLocaleLowerCase();
+  if (!/^[^\s,@]+@[^\s,@]+\.[^\s,@]+$/u.test(email)) {
+    throw new Error("GOOGLE_ALLOWED_EMAILS must contain exactly one administrator email");
+  }
+  return email;
+}
+
+export function isAdministrator(env: Env, email: string): boolean {
+  return email.toLocaleLowerCase() === configuredAdminEmail(env);
+}
+
+async function isAuthorizedEmail(env: Env, email: string): Promise<boolean> {
+  if (isAdministrator(env, email)) return true;
+  const setting = await env.DB.prepare(
+    "SELECT value FROM app_settings WHERE key='allow_external_members'",
+  ).first<{ value: string }>();
+  return setting?.value === "true";
 }
 
 function validTransaction(value: unknown): value is OAuthTransaction {
@@ -304,8 +325,7 @@ async function verifyGoogleIdToken(token: string, env: Env, nonce: string): Prom
   }
 
   const email = claimsValue.email.toLocaleLowerCase();
-  const allowed = allowedEmails(env);
-  if (allowed.size === 0 || !allowed.has(email)) throw new Error("Google account is not allowed");
+  if (!await isAuthorizedEmail(env, email)) throw new Error("Google account is not allowed");
   return { sub: claimsValue.sub, email, exp: now + SESSION_TTL_SECONDS };
 }
 
@@ -372,34 +392,51 @@ export async function createSessionValue(claims: SessionClaims, secret: string):
   return signPayload(encodeObject(claims), secret);
 }
 
-async function validRequestSession(request: Request, env: Env): Promise<boolean> {
+async function validRequestSession(request: Request, env: Env): Promise<SessionClaims | null> {
   const sessionCookie = cookieValue(request, SESSION_COOKIE);
   const payload = sessionCookie ? await verifySignedValue(sessionCookie, env.AUTH_SESSION_SECRET) : null;
-  if (!payload) return false;
+  if (!payload) return null;
   try {
     const value = decodeObject(payload);
-    return validSession(value)
-      && value.exp > Math.floor(Date.now() / 1000)
-      && value.sub.length > 0
-      && allowedEmails(env).has(value.email.toLocaleLowerCase());
+    if (!validSession(value)
+      || value.exp <= Math.floor(Date.now() / 1000)
+      || value.sub.length === 0
+      || !await isAuthorizedEmail(env, value.email)) {
+      return null;
+    }
+    return value;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function authenticate(request: Request, env: Env): Promise<Response | null> {
+export async function authenticate(request: Request, env: Env): Promise<AuthenticationResult> {
   const url = new URL(request.url);
-  if (request.method === "GET" && url.pathname === "/assets/app.css") return null;
-  if (request.method === "GET" && url.pathname === "/auth/callback") return callback(request, env);
+  if (request.method === "GET" && url.pathname === "/assets/app.css") {
+    return { session: null, response: null };
+  }
+  if (request.method === "GET" && url.pathname === "/auth/callback") {
+    return { session: null, response: await callback(request, env) };
+  }
   if (request.method === "GET" && url.pathname === "/auth/logout") {
-    return redirect("/", [clearCookie(SESSION_COOKIE), clearCookie(TRANSACTION_COOKIE)]);
+    return {
+      session: null,
+      response: redirect("/", [clearCookie(SESSION_COOKIE), clearCookie(TRANSACTION_COOKIE)]),
+    };
   }
   if (request.method === "GET" && url.pathname === "/auth/login") {
-    return createTransaction(request, env, safeReturnTo(url.searchParams.get("return_to")));
+    return {
+      session: null,
+      response: await createTransaction(request, env, safeReturnTo(url.searchParams.get("return_to"))),
+    };
   }
-  if (await validRequestSession(request, env)) return null;
+  const session = await validRequestSession(request, env);
+  if (session) return { session, response: null };
   if (request.method !== "GET" || url.pathname.startsWith("/api/") || url.pathname.startsWith("/assets/")) {
-    return authError("Authentication required", 401);
+    return { session: null, response: authError("Authentication required", 401) };
   }
-  return loginPage(safeReturnTo(`${url.pathname}${url.search}`));
+  return {
+    session: null,
+    response: loginPage(safeReturnTo(`${url.pathname}${url.search}`)),
+  };
 }

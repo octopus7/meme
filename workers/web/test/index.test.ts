@@ -1,16 +1,42 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
-import { createSessionValue } from "../src/auth";
+import { configuredAdminEmail, createSessionValue } from "../src/auth";
 
 const authEnv = Object.assign({} as Env, {
   GOOGLE_CLIENT_ID: "client.apps.googleusercontent.com",
   GOOGLE_CLIENT_SECRET: "google-client-secret",
   GOOGLE_REDIRECT_URI: "https://meme.example/auth/callback",
   GOOGLE_ALLOWED_EMAILS: "owner@example.com",
-  AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters"
+  AUTH_SESSION_SECRET: "test-session-secret-with-at-least-32-characters",
+  IMAGE_ORIGIN: "https://images.example"
 });
 
 describe("authenticated web worker", () => {
+  function emptyDb(setting = "false"): D1Database {
+    const db = Object.create(null) as D1Database;
+    db.prepare = () => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = () => statement;
+      statement.first = async <T>() => ({ value: setting }) as T;
+      statement.all = async <T>() => ({
+        success: true,
+        results: [] as T[],
+        meta: {
+          duration: 0,
+          size_after: 0,
+          rows_read: 0,
+          rows_written: 0,
+          last_row_id: 0,
+          changed_db: false,
+          changes: 0
+        }
+      });
+      statement.run = async <T>() => Object.create(null) as D1Result<T>;
+      return statement;
+    };
+    return db;
+  }
+
   it("shows a login button for an unauthenticated root request", async () => {
     const response = await worker.fetch(
       new Request("https://meme.example/"),
@@ -59,6 +85,18 @@ describe("authenticated web worker", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).not.toBe("");
+  });
+
+  it("keeps administrator page styles out of the public stylesheet", async () => {
+    const response = await worker.fetch(
+      new Request("https://meme.example/assets/app.css"),
+      authEnv
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).not.toContain(".admin-page");
+    expect(body).not.toContain(".logs-page");
   });
 
   it("renders search without deployment tail and uses a list icon link", async () => {
@@ -119,7 +157,277 @@ describe("authenticated web worker", () => {
     expect(body).toContain('href="/auth/logout">로그아웃</a>');
     expect(body).toContain('class="gallery"');
     expect(body).toContain("아직 등록된 이미지가 없습니다.");
+    expect(body).toContain('href="/admin"');
+    expect(body).toContain("⚙️");
     expect(body).toContain('id="deployment-info"');
+  });
+
+  it("hides administrator and statistics features from an external member", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("true") });
+    const session = await createSessionValue({
+      sub: "member-user-id",
+      email: "member@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const headers = { cookie: `__Host-meme_session=${session}` };
+
+    const all = await worker.fetch(new Request("https://meme.example/all", { headers }), env);
+    const body = await all.text();
+    expect(all.status).toBe(200);
+    expect(body).not.toContain("/admin");
+    expect(body).not.toContain("/logs");
+    expect(body).not.toContain("관리자");
+    expect(body).not.toContain("통계");
+    expect(body).not.toContain("data-delete");
+
+    for (const path of ["/admin", "/logs", "/assets/logs.js", "/assets/admin.css"]) {
+      const response = await worker.fetch(new Request(`https://meme.example${path}`, { headers }), env);
+      expect(response.status).toBe(404);
+      expect(await response.json()).toEqual({ error: "Not found" });
+    }
+  });
+
+  it("immediately rejects an external member when external login is disabled", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "member-user-id",
+      email: "member@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/all", {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Google로 로그인");
+  });
+
+  it("renders the administrator page and statistics link only for the administrator", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/admin", {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("owner@example.com");
+    expect(body).toContain('href="/logs"');
+    expect(body).toContain('action="/admin/settings"');
+    expect(body).toContain("/assets/admin.css");
+    expect(body).not.toContain(" checked>");
+  });
+
+  it("lets only the administrator change the external member setting", async () => {
+    let saved: unknown[] = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = () => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        saved = values;
+        return statement;
+      };
+      statement.run = async <T>() => Object.create(null) as D1Result<T>;
+      return statement;
+    };
+    const env = Object.assign({}, authEnv, { DB: db });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const body = new URLSearchParams({ allow_external: "on" });
+    const response = await worker.fetch(
+      new Request("https://meme.example/admin/settings", {
+        method: "POST",
+        headers: {
+          cookie: `__Host-meme_session=${session}`,
+          origin: "https://meme.example"
+        },
+        body
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe("/admin");
+    expect(saved).toEqual(["true"]);
+  });
+
+  it("rejects administrator setting changes without an exact Origin", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/admin/settings", {
+        method: "POST",
+        headers: { cookie: `__Host-meme_session=${session}` },
+        body: new URLSearchParams({ allow_external: "on" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("does not allow an external member to delete images", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("true") });
+    const session = await createSessionValue({
+      sub: "member-user-id",
+      email: "member@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/api/images/00000000-0000-0000-0000-000000000000", {
+        method: "DELETE",
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("requires an exact Origin for administrator deletes", async () => {
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/api/images/00000000-0000-0000-0000-000000000000", {
+        method: "DELETE",
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("renders log rows and statistics for the administrator", async () => {
+    const hash = "a".repeat(64);
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = () => statement;
+      statement.all = async <T>() => ({
+        success: true,
+        results: (sql.includes("GROUP BY")
+          ? [{
+              blob_hash: hash,
+              extension: "png",
+              description: "sample",
+              total_requests: 4,
+              cache_hits: 3,
+              cache_misses: 1,
+              cache_other: 0,
+              response_errors: 0
+            }]
+          : [{
+              id: 1,
+              requested_at: Math.floor(Date.now() / 1000) - 10,
+              blob_hash: hash,
+              media_kind: "original",
+              request_method: "GET",
+              cache_status: "HIT",
+              response_status: 200,
+              colo: "ICN",
+              extension: "png",
+              description: "sample"
+            }]) as T[],
+        meta: {
+          duration: 0,
+          size_after: 0,
+          rows_read: 0,
+          rows_written: 0,
+          last_row_id: 0,
+          changed_db: false,
+          changes: 0
+        }
+      });
+      return statement;
+    };
+    const env = Object.assign({}, authEnv, { DB: db });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/logs", {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("파일별 캐시 통계");
+    expect(body).toContain("HIT율");
+    expect(body).toContain("75.0%");
+    expect(body).toContain("ICN");
+    expect(body).toContain("/assets/logs.js");
+  });
+
+  it("rejects log ranges longer than the 90 day retention window", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: now + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request(`https://meme.example/logs?from=${now - 91 * 86400}&to=${now}`, {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("accepts a 90 day quick range after a short page delay", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const to = now - 30;
+    const from = to - 90 * 86400;
+    const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: now + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request(`https://meme.example/logs?from=${from}&to=${to}`, {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it("requires exactly one configured administrator email", () => {
+    expect(configuredAdminEmail(authEnv)).toBe("owner@example.com");
+    expect(() => configuredAdminEmail({
+      ...authEnv,
+      GOOGLE_ALLOWED_EMAILS: "one@example.com,two@example.com"
+    })).toThrow("exactly one administrator email");
   });
 
   it("serves baked deployment metadata with a valid session", async () => {

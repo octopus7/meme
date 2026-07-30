@@ -30,6 +30,13 @@ method/host/path만 사용하며 query string으로 cache miss를 만들 수 없
 log를 함께 확인합니다. 단일 위치의 최초 요청은 MISS일 수 있으며, 아직 채워지지
 않은 다른 edge location도 각각 최초 MISS가 발생할 수 있습니다.
 
+storage Worker는 hash, 원본/썸네일, GET/HEAD, `Cf-Cache-Status`, HTTP 상태와
+Cloudflare POP을 D1 요청 로그에 비동기로 기록합니다. 관리자만 요청 목록과
+1/7/30/90일 또는 직접 지정한 구간의 파일별 `HIT / 전체 요청` 비율을 조회합니다.
+로그에는 IP, 인증 헤더와 User-Agent를 저장하지 않으며 90일이 지나면 web Worker의
+10분 cron이 최대 10,000개씩 삭제합니다. 통계용 best-effort 기록이므로 D1 장애 중
+일부 로그는 누락될 수 있지만 이미지 응답은 실패시키지 않습니다.
+
 ## 참조 삭제
 
 사용자가 삭제하면 해당 사용자의 논리 참조만 제거합니다. 다른 참조가 있으면

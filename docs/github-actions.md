@@ -33,6 +33,8 @@ d1-production
 | secret | `CLOUDFLARE_API_TOKEN` | storage Worker 배포와 VPC bind 최소 권한 token |
 | variable | `CF_ACCOUNT_ID` | Cloudflare account ID |
 | variable | `STORAGE_WORKER_NAME` | 공개 storage Worker script 이름 |
+| variable | `D1_DATABASE_NAME` | web Worker와 같은 요청 로그 D1 이름 |
+| variable | `D1_DATABASE_ID` | web Worker와 같은 요청 로그 D1 ID |
 | variable | `VPC_SERVICE_ID` | 기존 HTTP VPC Service ID |
 | variable | `ORIGIN_BASE_URL` | Node VPC origin URL, 예: `http://meme-origin.internal:8086` |
 
@@ -106,8 +108,8 @@ column/table 제거는 별도 release로 나눕니다.
 권장 배포 순서:
 
 ```text
-하위 호환 storage Worker
-→ additive D1 migration
+additive D1 migration
+→ storage Worker
 → web Worker
 → smoke test
 → 후속 정리 migration
