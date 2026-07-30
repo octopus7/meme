@@ -2,7 +2,16 @@
 
 실제 ID, 도메인, 이메일과 토큰은 저장소에 기록하지 않습니다.
 
-## 1. Cloudflare에서 생성·확인
+## 1. Origin 설치
+
+- [ ] Node `8086` 또는 .NET `8087` 구현 선택
+- [ ] NAS 사용자 홈의 `~/meme`에 clone 및 서비스 설치
+- [ ] `systemctl status` 확인
+- [ ] 로컬 `/healthz` 성공 확인
+- [ ] 자동 생성된 origin mutation token 확인
+- [ ] 라우터 포트 포워딩이 없는지 확인
+
+## 2. Cloudflare에서 생성·확인
 
 - [ ] Account ID 확인
 - [ ] Zero Trust team name/domain 생성: `<TEAM>.cloudflareaccess.com`
@@ -13,6 +22,7 @@
 - [ ] 사용할 VPC Service ID 선택
 - [ ] web Worker 이름 결정
 - [ ] storage Worker 이름 결정
+- [ ] 같은 이름의 storage Worker를 대시보드에서 한 번 생성
 - [ ] web Custom Domain 결정: `https://<APP_DOMAIN>`
 - [ ] storage Custom Domain 결정: `https://<IMAGE_DOMAIN>`
 - [ ] storage Worker encrypted secret `ORIGIN_ADMIN_TOKEN` 등록
@@ -22,7 +32,7 @@
 
 API token은 대상 account/resource와 필요한 쓰기 권한만 허용합니다.
 
-## 2. GitHub Environments
+## 3. GitHub Environments
 
 ### `web-production`
 
@@ -38,7 +48,7 @@ Variables:
 - [ ] `D1_DATABASE_ID`
 - [ ] `STORAGE_WORKER_NAME`
 - [ ] `ACCESS_TEAM_DOMAIN`
-- [ ] `ACCESS_AUD`
+- [ ] `ACCESS_AUD`: Google/Access 설정 후 발급된 값
 - [ ] `IMAGE_ORIGIN=https://<IMAGE_DOMAIN>`
 
 ### `storage-production`
@@ -68,7 +78,7 @@ Variables:
 - [ ] `D1_DATABASE_NAME`
 - [ ] `D1_DATABASE_ID`
 
-## 3. Google 인증
+## 4. Google 인증
 
 Google Cloud:
 
@@ -94,10 +104,8 @@ Cloudflare Zero Trust:
 - [ ] Access application의 `AUD` 값을 `ACCESS_AUD`에 등록
 - [ ] `https://<IMAGE_DOMAIN>`에는 Access를 적용하지 않음
 
-## 4. 최초 실행 순서
+## 5. 배포 순서
 
-- [ ] Node `8086` 또는 .NET `8087` origin 설치
-- [ ] origin health check
 - [ ] `ORIGIN_ADMIN_TOKEN`과 origin mutation token 일치 확인
 - [ ] `Deploy storage Worker`
 - [ ] storage Custom Domain 연결
