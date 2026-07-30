@@ -25,13 +25,39 @@ for command in curl docker mktemp rm; do
     { echo "Missing command: $command" >&2; exit 1; }
 done
 
-if docker compose version >/dev/null 2>&1; then
-  compose() { docker compose "$@"; }
-elif command -v docker-compose >/dev/null 2>&1; then
-  compose() { docker-compose "$@"; }
+use_sudo=false
+if docker info >/dev/null 2>&1; then
+  :
+elif command -v sudo >/dev/null 2>&1 &&
+     sudo -v &&
+     sudo docker info >/dev/null 2>&1; then
+  use_sudo=true
 else
-  echo "Docker Compose is not available." >&2
+  echo "Cannot access the Docker daemon as $(id -un)." >&2
+  echo "Run this script from an account allowed to use Docker or grant sudo access." >&2
   exit 1
+fi
+
+if [ "$use_sudo" = true ]; then
+  if sudo docker compose version >/dev/null 2>&1; then
+    compose() { sudo docker compose "$@"; }
+  elif command -v docker-compose >/dev/null 2>&1 &&
+       sudo docker-compose version >/dev/null 2>&1; then
+    compose() { sudo docker-compose "$@"; }
+  else
+    echo "Docker Compose is not available." >&2
+    exit 1
+  fi
+else
+  if docker compose version >/dev/null 2>&1; then
+    compose() { docker compose "$@"; }
+  elif command -v docker-compose >/dev/null 2>&1 &&
+       docker-compose version >/dev/null 2>&1; then
+    compose() { docker-compose "$@"; }
+  else
+    echo "Docker Compose is not available." >&2
+    exit 1
+  fi
 fi
 
 installer="$(mktemp "${TMPDIR:-/tmp}/install-meme-origin.XXXXXXXX")"
