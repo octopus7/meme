@@ -22,6 +22,7 @@ import type { StoredBlob } from "./types";
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" };
 const LOG_PAGE_SIZE = 100;
 const LOG_RETENTION_SECONDS = 90 * 24 * 60 * 60;
+const SEARCH_RESULT_LIMIT = 100;
 
 function json(value: unknown, status = 200): Response {
   return Response.json(value, { status, headers: JSON_HEADERS });
@@ -234,12 +235,12 @@ async function route(request: Request, env: Env, session: SessionClaims | null):
     return new Response(JSON.stringify(deploymentInfo), { headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
   if (request.method === "GET" && url.pathname === "/search") {
-    return html(`<main><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p>${allLink()}</p><div id="results"></div></main>${assetScript("/assets/search.js")}`, 200, false);
+    return html(`<main class="search-page"><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p>${allLink()}</p><div id="results" class="search-grid" aria-live="polite"></div></main>${assetScript("/assets/search.js")}`, 200, false);
   }
   if (request.method === "GET" && url.pathname === "/api/search") {
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 200);
     if (!query) return new Response("", { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
-    const rows = await search(env, query, 5);
+    const rows = await search(env, query, SEARCH_RESULT_LIMIT);
     const body = rows.map((row) => imageMarkup(row, env, searchTerms(query))).join("");
     return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }

@@ -118,6 +118,22 @@ describe("authenticated web worker", () => {
     expect(body).not.toContain("/assets/deployment.js");
     expect(body).toContain('aria-label="전체 목록"');
     expect(body).toContain("📋");
+    expect(body).toContain('class="search-page"');
+    expect(body).toContain('class="search-grid"');
+    expect(body).toContain('aria-live="polite"');
+  });
+
+  it("uses compact fixed-size thumbnails for search results", async () => {
+    const response = await worker.fetch(
+      new Request("https://meme.example/assets/app.css"),
+      authEnv
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(body).toContain("grid-template-columns:repeat(auto-fill,44px)");
+    expect(body).toContain(".search-grid .meme-card{width:44px;height:44px");
+    expect(body).toContain(".search-grid .meme-card-body{display:none}");
   });
 
   it("renders the all page as a gallery with logout", async () => {

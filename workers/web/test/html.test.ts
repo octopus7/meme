@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOGS_JS, UPLOAD_JS } from "../src/assets";
+import { LOGS_JS, SEARCH_JS, UPLOAD_JS } from "../src/assets";
 import { allLink, assetScript, assetStyle, escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
@@ -55,6 +55,14 @@ describe("HTML helpers", () => {
     expect(UPLOAD_JS).toContain("await r.text()");
     expect(UPLOAD_JS).toContain('log("ERROR"');
     expect(UPLOAD_JS).toContain('log("DONE"');
+  });
+
+  it("searches debounced input while a Korean IME composition is active", () => {
+    expect(() => new Function(SEARCH_JS)).not.toThrow();
+    expect(SEARCH_JS).toContain('i.addEventListener("input",go)');
+    expect(SEARCH_JS).not.toContain("compositionstart");
+    expect(SEARCH_JS).not.toContain("compositionend");
+    expect(SEARCH_JS).not.toContain("if(ime)return");
   });
 
   it("formats log times in the browser timezone and submits epoch ranges", () => {
