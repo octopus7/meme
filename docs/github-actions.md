@@ -69,7 +69,7 @@ Cloudflare 권한 이름은 변경될 수 있으므로 token 생성 화면의 �
 |---|---|---|
 | `Deploy web Worker` | `workers/web/**` push 또는 수동 | web Worker만 |
 | `Deploy storage Worker` | `workers/storage/**` push 또는 수동 | storage Worker만 |
-| `Build origin` | `origin/**` push/PR 또는 수동 | Node.js 20.9 호환 모드 Linux x64 GitHub artifact만 |
+| `Build origin` | `origin/**` push/PR 또는 수동 | Node.js 24 Docker 검증 및 Linux x64 GitHub artifact만 |
 | `Build .NET origin` | `origin-dotnet/**` push/PR 또는 수동 | .NET 10 self-contained Linux x64 GitHub artifact만 |
 | `Migrate D1` | 수동 | D1 schema만 |
 
@@ -80,10 +80,9 @@ Cloudflare 권한 이름은 변경될 수 있으므로 token 생성 화면의 �
 
 Custom Domain, Access, Tunnel과 VPC Service 생성은 workflow가 변경하지 않습니다.
 Worker 배포가 Linux 파일을 복사·삭제하거나 서비스를 재시작하는 단계도 없습니다.
-origin build는 Node.js 20.9.0에서 `npm ci`, test, Linux x64용 `sharp` 0.35.3
-버전 및 로드 검증을 거쳐 production 의존성과 systemd 파일을 묶을 뿐이며 서버
-접속 credential을 사용하지 않습니다. 이 버전 고정은 Synology 호환 모드이며
-지원 중인 Node.js 22 이상으로 전환하면 workflow와 lockfile을 함께 갱신합니다.
+origin build는 Node.js 24에서 `npm ci`, test, Linux x64용 `sharp` 0.35.3 로드와
+Docker image build를 검증합니다. artifact에는 Container Manager와 systemd
+fallback 파일이 포함되지만 서버 접속 credential은 사용하지 않습니다.
 
 .NET origin build는 .NET SDK 10.0.x에서 lockfile 기반 restore, Release test,
 `linux-x64` self-contained publish를 수행합니다. 두 origin workflow 모두

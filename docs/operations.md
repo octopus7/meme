@@ -1,12 +1,19 @@
 # 캐시, 삭제와 복구
 
-## 런타임 지원 상태
+## 런타임과 컨테이너
 
-Linux origin의 Node.js 20 호환 모드는 XPEnology/Synology 장비 제약을 위한
-선택입니다. Node.js 20은 2026년 3월 24일 EOL되었으므로 최소 20.9.0과
-보안 수정된 `sharp` 0.35.3 고정을 임의로 낮추지 않고, origin port를 인터넷에
-직접 공개하지 않습니다. glibc 2.28을 제공하지 못하는 장비에서는 취약한 sharp
-버전 대신 `origin-dotnet`을 선택합니다.
+Node origin은 Synology Container Manager의 Debian Bookworm 기반 Node.js 24 LTS
+컨테이너를 권장합니다. DSM 자체 Node 또는 native 라이브러리에 의존하지 않으며
+`node:24-bookworm-slim` 기반 image를 보안 업데이트가 반영되도록 정기적으로
+rebuild합니다.
+
+- host에는 `127.0.0.1:8086`만 bind하고 라우터에 공개하지 않습니다.
+- `.env`, `data/`, `logs/`는 container image와 분리해 백업합니다.
+- read-only filesystem, capability drop, `no-new-privileges`가 유지되는지 확인합니다.
+- Container Manager health와 restart 횟수를 감시합니다.
+
+동일 계약의 .NET 10 origin은 8087에서 함께 실행할 수 있으며 storage Worker는
+선택한 VPC Service binding과 `ORIGIN_BASE_URL`을 사용합니다.
 
 ## 캐시
 

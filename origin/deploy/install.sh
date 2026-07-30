@@ -47,12 +47,12 @@ node_real="$(realpath -e "$(command -v node)")"
 npm_real="$(realpath -e "$(command -v npm)")"
 [[ -x "${node_real}" ]] || { echo "Resolved Node executable is not executable: ${node_real}" >&2; exit 1; }
 [[ -x "${npm_real}" ]] || { echo "Resolved npm executable is not executable: ${npm_real}" >&2; exit 1; }
-node -e 'const [M,m]=process.versions.node.split(".").map(Number); if(M!==20 || m<9) process.exit(1)' ||
-  { echo "Node >=20.9.0 and <21 is required; found $(node --version)." >&2; exit 1; }
+node -e 'const [major]=process.versions.node.split(".").map(Number); if(major!==24) process.exit(1)' ||
+  { echo "Node >=24 and <25 is required; found $(node --version)." >&2; exit 1; }
 glibc="$(ldd --version 2>&1 | awk 'NR==1{print $NF}')"
 echo "Preflight: node=$(node --version), arch=${arch}, glibc=${glibc} (sharp 0.35.3 linux-x64 requires glibc >=2.28)."
 awk -v v="${glibc}" 'BEGIN{split(v,a,"."); exit !(a[1]>2 || (a[1]==2 && a[2]>=28))}' ||
-  { echo "glibc ${glibc} is too old for the security-fixed sharp 0.35.3 binary; use origin-dotnet instead." >&2; exit 1; }
+  { echo "glibc ${glibc} is too old for sharp 0.35.3; use the bookworm Container Manager deployment." >&2; exit 1; }
 [[ -f "${origin}/package-lock.json" ]] || { echo "package-lock.json is required." >&2; exit 1; }
 
 sudo -v

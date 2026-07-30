@@ -31,12 +31,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.9.0
+          node-version: 24
           cache: npm
           cache-dependency-path: origin/package-lock.json
 
       - run: npm ci
       - run: npm test
+
+      - name: Build Node 24 container
+        run: docker build --tag meme-origin:ci .
 
       - name: Stage Node.js application
         run: |
@@ -56,9 +59,15 @@ jobs:
       - name: Package systemd files
         run: cp -R deploy dist/deploy
 
+      - name: Package Container Manager files
+        run: |
+          mkdir -p dist/container
+          cp Dockerfile compose.yaml .env.example package.json package-lock.json dist/container/
+          cp -R src docker dist/container/
+
       - uses: actions/upload-artifact@v4
         with:
-          name: meme-origin-node20-linux-x64-${{ github.sha }}
+          name: meme-origin-node24-linux-x64-${{ github.sha }}
           path: origin/dist
           if-no-files-found: error
           retention-days: 14

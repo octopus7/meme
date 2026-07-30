@@ -1,13 +1,68 @@
 # meme-origin
 
-Private Node.js image origin for the Meme Workers. It accepts raw JPEG, PNG,
-WebP, and GIF uploads, validates them with `sharp`, stores originals by their
-SHA-256 content hash, and creates autorotated, center-cropped 128×128 WebP
-thumbnails. Image work is serialized by default for the J1900.
+Private Node.js image origin for the Meme Workers. It validates JPEG, PNG,
+WebP, and GIF uploads with `sharp`, stores originals by SHA-256, and generates
+autorotated, center-cropped 128×128 WebP thumbnails. Image processing is
+serialized by default for the J1900.
+
+## Synology Container Manager
+
+The supported runtime is Node.js 24 on Debian Bookworm. Container use avoids
+depending on the older libraries or Node packages installed on DSM itself.
+
+Copy `origin/` to `/volume1/docker/meme-origin`, then:
+
+```sh
+cd /volume1/docker/meme-origin
+cp .env.example .env
+openssl rand -hex 32
+vi .env
+chmod 0600 .env
+mkdir -p data logs
+```
+
+Replace the placeholder mutation token and set `PUID`/`PGID` to the DSM user
+that owns `data` and `logs`. In Container Manager, select **Project → Create**,
+choose `/volume1/docker/meme-origin/compose.yaml`, build, and start it.
+
+The project provides:
+
+- `node:24-bookworm-slim`
+- host binding `127.0.0.1:8086`
+- persistent `data/` and `logs/` bind mounts
+- `restart: unless-stopped`
+- application health check
+- read-only container filesystem, dropped capabilities, and private `/tmp`
+
+Cloudflare Tunnel on the NAS can reach `http://127.0.0.1:8086`. Do not expose
+the mutation API directly through a router port-forward.
+
+### Install or update from a public GitHub archive without Git
+
+Download the installer once, then point it at the repository:
+
+```sh
+curl --fail --location --output /tmp/install-meme-origin.sh \
+  https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/install-from-github.sh
+bash /tmp/install-meme-origin.sh --repo octopus7/meme --ref main
+```
+
+It extracts only `origin/` into `/volume1/docker/meme-origin`, creates a secure
+`.env` on first install, and preserves `.env`, `data/`, and `logs/` on updates.
+Previous application files are retained under `backups/`. After an update,
+use Container Manager’s **Build** and **Recreate** actions for the project.
+The script does not use Git, Wrangler, Workers, or D1.
+
+For another volume path:
+
+```sh
+bash /tmp/install-meme-origin.sh --repo octopus7/meme \
+  --target /volume1/docker/my-meme-origin
+```
 
 ## API
 
-Public reads (network exposure is restricted by Tunnel/VPC):
+Public reads, normally reachable only through Tunnel/VPC:
 
 ```text
 GET|HEAD /i/{sha256}.{jpg|png|webp|gif}
@@ -15,92 +70,42 @@ GET|HEAD /t/{sha256}
 GET      /healthz
 ```
 
-Media supports ETag/If-None-Match, If-Modified-Since, and one byte range.
-Mutation requests require `Authorization: Bearer <token>`:
+Media supports ETag, If-None-Match, If-Modified-Since, and one byte range.
+Mutations require `Authorization: Bearer <token>`:
 
 ```text
 POST /internal/v1/blobs                    raw image body
 POST /internal/v1/blobs/{sha256}/trash
-POST /internal/v1/blobs/{sha256}/restore   administrator only
-POST /internal/v1/admin/purge              administrator only
+POST /internal/v1/blobs/{sha256}/restore
+POST /internal/v1/admin/purge
 ```
 
-Upload responses use `{hash, extension, mimeType, size, deduplicated}`.
-Duplicate content reuses the original. A blob whose final reference was
-removed enters administrator-only trash for 30 days; it returns 404 and cannot
-be resurrected by upload. The scheduled purge removes expired originals,
-thumbnails, and records.
+Upload responses are `{hash, extension, mimeType, size, deduplicated}`.
+Duplicate content reuses its original. Trashed content returns 404, cannot be
+restored by another upload, and is physically purged after 30 days unless an
+administrator restores it.
 
 Every request is one JSON object in
-`/var/log/meme-origin/access-YYYY-MM-DD.log`. The logger records UTC timestamp,
-method, path without query, status, response bytes, duration, remote IP, and
-user agent. It never records Authorization, queries, bodies, or tokens. Logs
-older than 30 days are atomically changed to `.log.gz`; gzip files are kept.
-
-## Requirements
-
-- x86-64 systemd Linux
-- Node.js `>=20.9.0 <21`
-- glibc 2.28 or newer for the pinned, security-fixed `sharp` 0.35.3 Linux x64 binary
-- Git, npm, curl, OpenSSL, sudo, and standard Linux account tools
-
-Node 20 itself is EOL. This compatibility build remains available for the
-Synology constraint, but the installer refuses the older vulnerable sharp
-0.33 line. If the NAS has glibc older than 2.28, use the managed
-`origin-dotnet` implementation instead of weakening the image decoder.
-
-Node 20 is intentionally pinned for the target Synology environment. The
-installer prints the detected Node, architecture, and glibc versions and
-performs a real `sharp` import before switching releases. Because Synology may
-install Node outside `/usr/bin`, the installer resolves the active executable
-and atomically maintains `/opt/meme-origin/node`; systemd uses that stable
-symlink.
-
-## First install
-
-Run as the target login user, not root:
-
-```sh
-curl --fail --location --output /tmp/meme-origin-install.sh \
-  https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/origin/deploy/install.sh
-bash /tmp/meme-origin-install.sh \
-  --repo-url https://github.com/YOUR_ORG/YOUR_REPO.git
-```
-
-The script clones to `~/meme`, installs only `origin/` into an immutable
-`/opt/meme-origin/releases/<timestamp>-<commit>/` release, and atomically
-switches `/opt/meme-origin/current`. It never invokes Wrangler, deploys a
-Worker, or changes D1. The generated 256-bit token exists only in the root-only
-`/etc/meme-origin/meme-origin.env`. Data and logs remain in
-`/var/lib/meme-origin` and `/var/log/meme-origin`.
-
-## Update and development install
-
-```sh
-bash ~/meme/origin/deploy/install.sh
-bash ~/meme/origin/deploy/install.sh --no-pull
-```
-
-Normal updates use `git pull --ff-only` and re-execute the newly pulled
-installer. The environment, data, and logs are preserved. The new release is
-activated only after `npm ci --omit=dev` and a real sharp load check. A failed
-service health check restores the previous release symlink. Worker and D1
-deployments remain separate.
+`logs/access-YYYY-MM-DD.log`. Authorization, query strings, bodies, and tokens
+are never logged. Logs older than 30 days are atomically compressed to
+`.log.gz`, which is retained.
 
 ## Local verification
+
+Node.js `>=24 <25` is required outside Docker:
 
 ```sh
 cd origin
 npm ci
 npm test
-MEME_ORIGIN_MUTATION_TOKEN="$(openssl rand -hex 32)" npm start
+docker compose config
+docker compose build
 ```
 
-Configuration is provided only through the environment; see
-`deploy/meme-origin.env.example`. Do not commit tokens, `.env` files,
-`node_modules`, data, or access logs. The default private listener is
-`127.0.0.1:8086`.
+For a non-container systemd deployment, `deploy/install.sh` remains available
+and now requires Node.js 24 plus glibc 2.28 for `sharp` 0.35.3. The Docker
+deployment is preferred on Synology.
 
-To use a non-default log directory, create it for `meme-origin` and add that
-exact path to a systemd `ReadWritePaths` override. The supplied hardened unit
-permits writes only to the default data and log directories.
+Configuration is environment-only; see `.env.example` for Container Manager
+and `deploy/meme-origin.env.example` for systemd. Never commit `.env`, tokens,
+`node_modules`, stored images, or logs.

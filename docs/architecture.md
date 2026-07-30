@@ -29,7 +29,7 @@ flowchart LR
 
     subgraph HOME["가정 내부망 · XPEnology x86 J1900"]
         C{"포트별 VPC Service 선택<br/>VPC_SERVICE_ID + ORIGIN_BASE_URL"}
-        O["Node.js meme-origin.service<br/>127.0.0.1:8086"]
+        O["Node.js 24 Docker<br/>Container Manager<br/>127.0.0.1:8086"]
         OD[".NET meme-origin-dotnet.service<br/>127.0.0.1:8087"]
         F[("선택한 origin의 active 파일<br/>원본 + 128×128 WebP")]
         X[("선택한 origin의 trash<br/>관리자만 복구 · 30일 후 삭제")]
@@ -141,15 +141,15 @@ flowchart TB
         WW["deploy-web-worker.yml<br/>web-production"]
         SW["deploy-storage-worker.yml<br/>storage-production"]
         DB["migrate-d1.yml<br/>d1-production · 수동 승인"]
-        OB["build-origin.yml<br/>Node.js 20.9 호환 모드<br/>Linux x64 artifact"]
+        OB["build-origin.yml<br/>Node.js 24 + Docker 검증<br/>Linux x64 artifact"]
         ODB["build-origin-dotnet.yml<br/>.NET 10<br/>self-contained Linux x64 artifact"]
     end
 
     GH -->|"workers/web/**"| WW --> W["web Worker만"]
     GH -->|"workers/storage/**"| SW --> S["storage Worker만"]
     GH -->|"database/d1/**"| DB --> D[("D1 schema만")]
-    GH -->|"origin/**"| OB --> AR["Linux x64 앱·production 의존성·systemd 파일"]
-    AR -->|"장비 관리자가 수동 설치"| O["meme-origin.service만 재시작"]
+    GH -->|"origin/**"| OB --> AR["Docker/Compose·Linux x64 앱·fallback 파일"]
+    AR -->|"Container Manager에서 build/recreate"| O["Node origin container만 갱신"]
     GH -->|"origin-dotnet/**"| ODB --> DAR["self-contained 앱·systemd 파일"]
     DAR -->|"장비 관리자가 수동 설치"| DO["meme-origin-dotnet.service만 재시작"]
 ```

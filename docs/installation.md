@@ -8,7 +8,7 @@
 - Cloudflare에 연결된 도메인
 - Google 계정과 Cloudflare Zero Trust 사용 권한
 - GitHub Actions가 활성화된 이 저장소
-- x86-64 Linux 서버, Node.js 20.9.0 이상과 glibc 2.28 이상 또는 .NET 10, `systemd`
+- x86-64 Synology/XPEnology의 Container Manager(Docker) 또는 .NET 10 실행 환경
 - Linux 서버에서 외부 Cloudflare로 나가는 HTTPS 연결
 - origin 데이터 디렉터리를 위한 충분한 디스크와 별도 백업
 
@@ -26,7 +26,8 @@ img.example.com  공개 이미지 Worker
 
 동일한 URI와 JSON 계약을 제공하는 구현 중 하나를 선택합니다.
 
-- [Node.js origin 설치](origin.md): `meme-origin.service`, 기본 `127.0.0.1:8086`
+- [Node.js 24 Docker origin 설치](origin.md): Container Manager project, 기본
+  `127.0.0.1:8086`
 - [.NET 10 origin 설치](origin-dotnet.md): `meme-origin-dotnet.service`, 기본
   `127.0.0.1:8087`
 
@@ -36,10 +37,11 @@ img.example.com  공개 이미지 Worker
 어느 구현이든 loopback 또는 Tunnel이 도달할 수 있는 사설 주소에서만 수신하게
 하고 라우터의 포트 포워딩은 만들지 않습니다.
 
-Node.js 20은 2026년 3월 24일 EOL된 런타임입니다. 이 구성은 Synology 계열 장비
-호환을 위한 예외이며, 알려진 libvips 취약점이 수정된 `sharp` 0.35.3을 사용하므로
-Node 20.9 이상과 glibc 2.28 이상이 필요합니다. 조건을 충족하지 못하면 취약한
-sharp로 낮추지 말고 별도 `origin-dotnet` 구현을 사용합니다.
+Synology에서는 DSM에 Node를 직접 설치하지 않고 Debian Bookworm 기반 Node.js 24
+LTS 컨테이너를 사용합니다. 설치 소스는
+`https://github.com/octopus7/meme`의 `origin/`이며 실제 `.env`와 token은 NAS에만
+둡니다. Container Manager를 사용할 수 없다면 .NET 10 self-contained origin이나
+Node systemd fallback의 적합성을 별도로 검토합니다.
 
 선택한 서비스가 정상인지 Linux 서버에서 확인합니다.
 
