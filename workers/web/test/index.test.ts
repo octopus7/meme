@@ -25,7 +25,10 @@ describe("authenticated web worker", () => {
     expect(location.searchParams.get("state")).not.toBe("");
     expect(location.searchParams.get("nonce")).not.toBe("");
     expect(location.searchParams.get("code_challenge_method")).toBe("S256");
-    expect(response.headers.get("set-cookie")).toContain("__Host-meme_oauth=");
+    const transactionCookie = response.headers.get("set-cookie");
+    expect(transactionCookie).toContain("__Host-meme_oauth=");
+    expect(transactionCookie).toContain("Path=/;");
+    expect(transactionCookie).not.toContain("Path=/auth/callback");
   });
 
   it("serves a protected asset with a valid session", async () => {

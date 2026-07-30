@@ -215,7 +215,7 @@ async function createTransaction(request: Request, env: Env, returnTo: string): 
   authorization.searchParams.set("code_challenge", challenge);
   authorization.searchParams.set("code_challenge_method", "S256");
   return redirect(authorization.toString(), [
-    secureCookie(TRANSACTION_COOKIE, transactionValue, TRANSACTION_TTL_SECONDS, "/auth/callback")
+    secureCookie(TRANSACTION_COOKIE, transactionValue, TRANSACTION_TTL_SECONDS)
   ]);
 }
 
@@ -337,7 +337,7 @@ async function callback(request: Request, env: Env): Promise<Response> {
       transaction = null;
     }
   }
-  const clearTransaction = clearCookie(TRANSACTION_COOKIE, "/auth/callback");
+  const clearTransaction = clearCookie(TRANSACTION_COOKIE);
   if (!transaction || transaction.exp <= Math.floor(Date.now() / 1000)) {
     return authError("Login session expired. Start again.", 401);
   }
@@ -384,7 +384,7 @@ export async function authenticate(request: Request, env: Env): Promise<Response
   const url = new URL(request.url);
   if (request.method === "GET" && url.pathname === "/auth/callback") return callback(request, env);
   if (request.method === "GET" && url.pathname === "/auth/logout") {
-    return redirect("/", [clearCookie(SESSION_COOKIE), clearCookie(TRANSACTION_COOKIE, "/auth/callback")]);
+    return redirect("/", [clearCookie(SESSION_COOKIE), clearCookie(TRANSACTION_COOKIE)]);
   }
   if (request.method === "GET" && url.pathname === "/auth/login") {
     return createTransaction(request, env, safeReturnTo(url.searchParams.get("return_to")));
