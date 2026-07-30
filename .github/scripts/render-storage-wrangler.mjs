@@ -12,7 +12,7 @@ const config = {
   main: "src/index.ts",
   compatibility_date: "2026-07-30",
   name: required("STORAGE_WORKER_NAME"),
-  workers_dev: false,
+  workers_dev: true,
   preview_urls: false,
   observability: { enabled: true },
   cache: {
