@@ -43,7 +43,7 @@ export function loadConfig() {
     maxUploadBytes: positiveInteger("MEME_ORIGIN_MAX_UPLOAD_BYTES", 25 * 1024 * 1024),
     maxImagePixels: positiveInteger("MEME_ORIGIN_MAX_IMAGE_PIXELS", 80_000_000),
     trashRetentionMs: durationMs("MEME_ORIGIN_TRASH_RETENTION", 30 * 86_400_000),
-    purgeIntervalMs: durationMs("MEME_ORIGIN_PURGE_INTERVAL", 3_600_000),
+    purgeIntervalMs: durationMs("MEME_ORIGIN_PURGE_INTERVAL", 86_400_000),
     requestTimeoutMs: durationMs("MEME_ORIGIN_REQUEST_TIMEOUT", 120_000),
     shutdownTimeoutMs: durationMs("MEME_ORIGIN_SHUTDOWN_TIMEOUT", 20_000),
     imageConcurrency: positiveInteger("MEME_ORIGIN_IMAGE_CONCURRENCY", 1),

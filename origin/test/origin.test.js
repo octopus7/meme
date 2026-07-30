@@ -23,7 +23,7 @@ async function fixture() {
     maxUploadBytes: 2 * 1024 * 1024,
     maxImagePixels: 1_000_000,
     trashRetentionMs: 30 * 86_400_000,
-    purgeIntervalMs: 3_600_000,
+    purgeIntervalMs: 86_400_000,
     requestTimeoutMs: 10_000,
     shutdownTimeoutMs: 2_000,
     imageConcurrency: 1,
@@ -80,6 +80,7 @@ test("HTTP auth, ranges, conditional request, and trash 404", async (t) => {
     await f.close();
   });
   const content = await png();
+  assert.equal((await fetch(`${base}/healthz`)).status, 200);
   assert.equal((await fetch(`${base}/internal/v1/blobs`, { method: "POST", body: content })).status, 401);
   const uploadedResponse = await fetch(`${base}/internal/v1/blobs?secret=not-logged`, {
     method: "POST",
@@ -106,6 +107,7 @@ test("HTTP auth, ranges, conditional request, and trash 404", async (t) => {
   const logText = await readFile(path.join(f.config.accessLogDir, logName), "utf8");
   assert(!logText.includes("not-logged"));
   assert(!logText.includes(TOKEN));
+  assert(!logText.includes('"path":"/healthz"'));
   assert(logText.includes('"status":201'));
 });
 

@@ -18,7 +18,9 @@ const MIME = Object.freeze({
 
 export function createOriginServer({ config, store, accessLogger, logger = console }) {
   const server = createServer((request, response) => {
-    accessLogger?.observe(request, response);
+    if (safePath(request.url) !== "/healthz") {
+      accessLogger?.observe(request, response);
+    }
     setSecurityHeaders(response);
     route(request, response, { config, store }).catch((error) => {
       logger.error("request failed", {

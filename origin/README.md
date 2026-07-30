@@ -85,7 +85,7 @@ Duplicate content reuses its original. Trashed content returns 404, cannot be
 restored by another upload, and is physically purged after 30 days unless an
 administrator restores it.
 
-Every request is one JSON object in
+Every non-health request is one JSON object in
 `logs/access-YYYY-MM-DD.log`. Authorization, query strings, bodies, and tokens
 are never logged. Logs older than 30 days are atomically compressed to
 `.log.gz`, which is retained.

@@ -110,7 +110,10 @@ Container Manager를 우선합니다.
 ## 운영 점검
 
 - Container Manager health, restart 횟수와 image build 실패를 감시합니다.
-- `logs/access-YYYY-MM-DD.log`에 Authorization, query, body와 token이 없는지 확인합니다.
+- `/healthz`를 제외한 요청이 기록되는 `logs/access-YYYY-MM-DD.log`에
+  Authorization, query, body와 token이 없는지 확인합니다.
+- 만료된 trash 검사는 기본적으로 하루에 한 번 실행됩니다
+  (`MEME_ORIGIN_PURGE_INTERVAL=1d`).
 - 30일이 지난 access log의 gzip 압축과 trash purge를 점검합니다.
 - `data/`의 원본·thumbnail·trash와 `.env`를 별도 백업합니다.
 - `data/`, `logs/` 소유권을 바꿀 때 `PUID`/`PGID`도 함께 검증합니다.
