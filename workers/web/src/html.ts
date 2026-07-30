@@ -23,6 +23,11 @@ export function html(body: string, status = 200): Response {
   });
 }
 
+export function uploadForm(collapsible = false): string {
+  const content = `<form id="upload-form"><p><label>이미지 <input name="image" type="file" accept="image/*" required></label></p><p><label>설명 <input name="description" maxlength="500" required></label></p><button>upload</button></form><p id="upload-message" role="status"></p>`;
+  return collapsible ? `<details><summary>upload</summary>${content}</details>` : content;
+}
+
 export function textBytes(value: string): number {
   return encoder.encode(value).byteLength;
 }

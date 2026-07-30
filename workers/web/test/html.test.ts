@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeHtml, highlight, html } from "../src/html";
+import { escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
@@ -21,5 +21,15 @@ describe("HTML helpers", () => {
 
     expect(body).toContain('id="deployment-info"');
     expect(body).toContain('src="/assets/deployment.js"');
+  });
+
+  it("renders a collapsed upload form with a visible description label", () => {
+    const markup = uploadForm(true);
+
+    expect(markup).toContain("<details>");
+    expect(markup).not.toContain("<details open");
+    expect(markup).toContain("<summary>upload</summary>");
+    expect(markup).toContain('<label>설명 <input name="description"');
+    expect(markup).toContain('id="upload-form"');
   });
 });

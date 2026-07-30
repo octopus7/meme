@@ -2,7 +2,7 @@ import { ALL_JS, DEPLOYMENT_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
 import { authenticate } from "./auth";
 import { addItem, encodeCursor, list, search, searchTerms, type ImageRow } from "./db";
 import deploymentInfo from "./deployment-info.generated.json";
-import { escapeHtml, highlight, html, textBytes } from "./html";
+import { escapeHtml, highlight, html, textBytes, uploadForm } from "./html";
 import type { StoredBlob } from "./types";
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" };
@@ -169,10 +169,10 @@ async function route(request: Request, env: Env): Promise<Response> {
     const hasMore = rows.length > 50;
     const visible = rows.slice(0, 50);
     const next = hasMore && visible.length ? `<p><a href="/all?cursor=${encodeURIComponent(encodeCursor(visible[visible.length - 1]!))}">next</a></p>` : "";
-    return html(`<nav><a href="/search">search</a> <a href="/upload">upload</a></nav><main>${visible.map((row) => imageMarkup(row, env, [], true)).join("")}${next}</main><script src="/assets/all.js" defer></script>`);
+    return html(`<nav><a href="/search">search</a></nav><main>${uploadForm(true)}${visible.map((row) => imageMarkup(row, env, [], true)).join("")}${next}</main><script src="/assets/upload.js" defer></script><script src="/assets/all.js" defer></script>`);
   }
   if (request.method === "GET" && url.pathname === "/upload") {
-    return html(`<nav><a href="/search">search</a> <a href="/all">all</a></nav><main><form><input name="image" type="file" accept="image/*" required><input name="description" aria-label="설명" maxlength="500" required><button>upload</button></form><p id="message"></p></main><script src="/assets/upload.js" defer></script>`);
+    return html(`<nav><a href="/search">search</a> <a href="/all">all</a></nav><main>${uploadForm()}</main><script src="/assets/upload.js" defer></script>`);
   }
   if (request.method === "POST" && url.pathname === "/api/images") return upload(request, env);
   const match = /^\/api\/images\/([0-9a-f-]{36})$/u.exec(url.pathname);
