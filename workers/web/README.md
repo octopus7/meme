@@ -1,4 +1,4 @@
-# 공개 웹 Worker
+# Google 인증 웹 Worker
 
 이 디렉터리는 독립적으로 배포됩니다. Cloudflare 계정 ID, D1 ID, 호스트명과
 API 토큰은 저장하지 않습니다.
@@ -14,11 +14,15 @@ CI는 GitHub Environment 변수로 아래 값을 제공한 뒤
 - `D1_DATABASE_NAME`
 - `D1_DATABASE_ID`
 - `STORAGE_WORKER_NAME`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_REDIRECT_URI`
+- `GOOGLE_ALLOWED_EMAILS`
 
 `CLOUDFLARE_API_TOKEN`은 GitHub Environment secret으로, `CF_ACCOUNT_ID`는
-Environment variable로 관리합니다. 웹 화면과 API는 인증 없이 공개되며 업로드와
-삭제도 누구나 실행할 수 있습니다. 접근 제한이 필요하면 배포 전에 별도의 인증
-계층을 추가해야 합니다.
+Environment variable로 관리합니다. `GOOGLE_CLIENT_SECRET`과
+`AUTH_SESSION_SECRET`은 web Worker의 encrypted secret으로 직접 등록합니다.
+웹 화면과 API는 유효한 Google 로그인 세션과 허용 이메일이 있어야 접근할 수
+있습니다. 자세한 발급 및 URL 설정은 `docs/google-oauth.md`를 참고합니다.
 
 `STORAGE_ADMIN` 서비스 바인딩 계약은 다음과 같습니다.
 

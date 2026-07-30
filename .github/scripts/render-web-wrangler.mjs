@@ -18,7 +18,13 @@ const config = {
   observability: { enabled: true },
   vars: {
     IMAGE_ORIGIN: required("IMAGE_ORIGIN"),
+    GOOGLE_CLIENT_ID: required("GOOGLE_CLIENT_ID"),
+    GOOGLE_REDIRECT_URI: required("GOOGLE_REDIRECT_URI"),
+    GOOGLE_ALLOWED_EMAILS: required("GOOGLE_ALLOWED_EMAILS"),
     MAX_UPLOAD_BYTES: "20971520",
+  },
+  secrets: {
+    required: ["GOOGLE_CLIENT_SECRET", "AUTH_SESSION_SECRET"],
   },
   d1_databases: [
     {

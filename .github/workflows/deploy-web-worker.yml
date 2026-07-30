@@ -31,6 +31,9 @@ jobs:
       D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
       STORAGE_WORKER_NAME: ${{ vars.STORAGE_WORKER_NAME }}
       IMAGE_ORIGIN: ${{ vars.IMAGE_ORIGIN }}
+      GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      GOOGLE_REDIRECT_URI: ${{ vars.GOOGLE_REDIRECT_URI }}
+      GOOGLE_ALLOWED_EMAILS: ${{ vars.GOOGLE_ALLOWED_EMAILS }}
 
     steps:
       - uses: actions/checkout@v4

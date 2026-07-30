@@ -50,6 +50,14 @@ Variables:
 - [ ] `D1_DATABASE_ID`
 - [ ] `STORAGE_WORKER_NAME`
 - [ ] `IMAGE_ORIGIN=https://<IMAGE_DOMAIN>`
+- [ ] `GOOGLE_CLIENT_ID`
+- [ ] `GOOGLE_REDIRECT_URI=https://<APP_DOMAIN>/auth/callback`
+- [ ] `GOOGLE_ALLOWED_EMAILS`
+
+Cloudflare web Worker encrypted secrets:
+
+- [ ] `GOOGLE_CLIENT_SECRET`
+- [ ] `AUTH_SESSION_SECRET`
 
 ### `storage-production`
 
@@ -86,5 +94,6 @@ Variables:
 - [ ] `Migrate D1`
 - [ ] `Deploy web Worker`
 - [ ] web Custom Domain 연결
-- [ ] 인증 없는 브라우저에서 web 화면, 업로드, 검색, 캐시 HIT, 삭제 후 404 확인
-- [ ] 공개 업로드·삭제 API가 의도한 운영 정책인지 최종 확인
+- [ ] 인증 없는 브라우저가 Google 인증 화면으로 이동하는지 확인
+- [ ] 허용 계정으로 web 화면, 업로드, 검색, 캐시 HIT, 삭제 후 404 확인
+- [ ] 허용목록 밖의 Google 계정이 차단되는지 확인

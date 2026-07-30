@@ -1,4 +1,5 @@
 import { ALL_JS, SEARCH_JS, UPLOAD_JS } from "./assets";
+import { authenticate } from "./auth";
 import { addItem, encodeCursor, list, search, searchTerms, type ImageRow } from "./db";
 import { escapeHtml, highlight, html, textBytes } from "./html";
 import type { StoredBlob } from "./types";
@@ -175,6 +176,8 @@ async function route(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
+      const authentication = await authenticate(request, env);
+      if (authentication) return authentication;
       return await route(request, env);
     } catch (error) {
       console.error(JSON.stringify({ event: "request_failed", path: new URL(request.url).pathname, error: String(error) }));

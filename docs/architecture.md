@@ -9,7 +9,7 @@
 flowchart LR
     U["브라우저"]
     subgraph CF["Cloudflare"]
-        W["web Worker<br/>/ → /search<br/>/search · /all · 업로드 · 삭제"]
+        W["Google 인증 web Worker<br/>/ → /search<br/>/search · /all · 업로드 · 삭제"]
         D[("D1<br/>blob · 항목 참조 · 설명 · 원래 파일명")]
 
         subgraph S["공개 storage Worker"]
@@ -30,7 +30,7 @@ flowchart LR
         X[("선택한 origin의 trash<br/>관리자만 복구 · 30일 후 삭제")]
     end
 
-    U -->|"공개 웹 요청"| W
+    U -->|"Google OAuth + 서명 세션"| W
     W <--> D
     W -->|"Service Binding"| AD
     U -->|"주소를 아는 누구나<br/>공개 이미지 GET/HEAD"| R
@@ -50,15 +50,15 @@ flowchart LR
     X -->|"30일 만료 purge"| P["물리 삭제"]
 ```
 
-`web Worker`는 인증 없이 공개합니다. `/`은 빈 `/search`로
-이동합니다. `/search`는 입력 중 최대 5개 결과만 갱신하고 `/all`은 전체 목록을
-페이지 단위로 보여 줍니다. 업로드와 삭제 API도 공개되므로 인터넷에서 누구나
-컬렉션을 변경할 수 있습니다.
+`web Worker`는 Google OpenID Connect 로그인을 요구합니다. 유효한 서명 세션이
+없으면 Google 인증 화면으로 이동하며, 검증된 이메일이 운영 허용목록에 포함된
+경우에만 `/search`, `/all`, 업로드와 삭제 API를 사용할 수 있습니다.
 
 반대로 `storage Worker`의 기본 라우트는 공개입니다. `/i/{sha256}.{ext}`와
 `/t/{sha256}` 주소를 아는 사용자는 인증 없이 파일을 읽을 수 있습니다. origin 관리
 API는 외부에 노출하지 않고 `web Worker`에서 `Admin` named entrypoint로만
-호출하지만, 그 작업을 시작하는 web Worker의 업로드·삭제 API는 공개됩니다.
+호출하며, 그 작업을 시작하는 web Worker의 업로드·삭제 API에는 Google 인증이
+적용됩니다.
 
 Node.js origin은 8086, 동일 URI/JSON 계약의 .NET 10 origin은 8087을 사용합니다.
 두 서비스는 동시에 실행할 수 있으며 포트별 VPC Service를 각각 만든 뒤 storage

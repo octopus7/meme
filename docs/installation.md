@@ -14,7 +14,7 @@
 권장 호스트 분리는 다음과 같습니다.
 
 ```text
-app.example.com  공개 웹 Worker
+app.example.com  Google 인증 웹 Worker
 img.example.com  공개 이미지 Worker
 ```
 
@@ -89,17 +89,17 @@ GitHub Actions에서 다음 순서로 실행합니다.
 Worker의 Custom Domain과 Route는 대시보드에서 관리합니다. 도메인·zone ID를
 Wrangler 파일에 커밋하지 않습니다.
 
-## 5. 공개 도메인 확인
+## 5. 도메인과 Google 인증 확인
 
-`app.example.com`과 `img.example.com` 모두 인증 없이 공개합니다.
-`app.example.com/`이 `/search`로 이동하고 정적 화면과 API가 정상 응답하는지
-확인합니다. 업로드와 삭제 API도 공개되므로 이 구성이 의도한 운영 정책인지
-배포 전에 확인합니다.
+`app.example.com`은 Google 인증을 요구하고 `img.example.com`의 이미지 읽기
+경로는 공개합니다. `docs/google-oauth.md`에 따라 Google OAuth redirect URI와
+Worker secret을 먼저 설정합니다.
 
 ## 6. 점검
 
-- 비공개 브라우저 창에서 별도 인증 없이 `app.example.com`이 열린다.
-- `/`가 `/search`로 이동한다.
+- 비공개 브라우저 창에서 `app.example.com`을 열면 Google 인증 화면으로 이동한다.
+- 허용된 Google 계정으로 로그인한 뒤 `/`가 `/search`로 이동한다.
+- 허용목록에 없는 Google 계정은 세션을 만들 수 없다.
 - `/search`의 빈 입력은 이미지 요청이나 검색 API 호출을 만들지 않는다.
 - 검색 입력 중 결과가 최대 5개만 나타난다.
 - `/all`은 전체 항목을 표시한다.
