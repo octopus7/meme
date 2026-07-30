@@ -22,15 +22,13 @@ Git 없이 공개 GitHub archive에서 `origin/`만 설치하거나 업데이트
 ```bash
 curl --fail --location --output /tmp/install-meme-origin.sh \
   https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/install-from-github.sh
-bash /tmp/install-meme-origin.sh \
-  --repo octopus7/meme \
-  --ref main
+sh /tmp/install-meme-origin.sh
 ```
 
 기본 대상은 `/volume1/docker/meme-origin`입니다. 다른 volume을 쓰려면 명시합니다.
 
 ```bash
-bash /tmp/install-meme-origin.sh \
+sh /tmp/install-meme-origin.sh \
   --repo octopus7/meme \
   --ref main \
   --target /volume1/docker/meme-origin
@@ -90,9 +88,7 @@ Compose 구성은 다음 안전 경계를 적용합니다.
 **Build**와 **Recreate**를 수행합니다.
 
 ```bash
-bash /tmp/install-meme-origin.sh \
-  --repo octopus7/meme \
-  --ref main
+sh /tmp/install-meme-origin.sh
 ```
 
 업데이트 전 `data/`, `.env`와 로그를 백업합니다. 새 컨테이너 health check가

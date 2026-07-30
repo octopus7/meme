@@ -44,7 +44,7 @@ Download the installer once, then point it at the repository:
 ```sh
 curl --fail --location --output /tmp/install-meme-origin.sh \
   https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/install-from-github.sh
-bash /tmp/install-meme-origin.sh --repo octopus7/meme --ref main
+sh /tmp/install-meme-origin.sh
 ```
 
 It extracts only `origin/` into `/volume1/docker/meme-origin`, creates a secure
@@ -56,7 +56,7 @@ The script does not use Git, Wrangler, Workers, or D1.
 For another volume path:
 
 ```sh
-bash /tmp/install-meme-origin.sh --repo octopus7/meme \
+sh /tmp/install-meme-origin.sh --repo octopus7/meme \
   --target /volume1/docker/my-meme-origin
 ```
 

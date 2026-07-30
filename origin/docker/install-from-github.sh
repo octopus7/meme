@@ -1,84 +1,89 @@
-#!/usr/bin/env bash
-set -Eeuo pipefail
-IFS=$'\n\t'
+#!/bin/sh
+set -eu
 
-repository="${MEME_GITHUB_REPOSITORY:-}"
+repository="${MEME_GITHUB_REPOSITORY:-octopus7/meme}"
 ref="${MEME_GITHUB_REF:-main}"
 target="${MEME_INSTALL_ROOT:-/volume1/docker/meme-origin}"
 
 usage() {
-  echo "Usage: install-from-github.sh --repo OWNER/REPO [--ref REF] [--target /volume1/docker/NAME]"
+  echo "Usage: install-from-github.sh [--repo OWNER/REPO] [--ref REF] [--target /volume1/docker/NAME]"
 }
 
-while (($#)); do
+while [ "$#" -gt 0 ]; do
   case "$1" in
-    --repo) repository="${2:?--repo requires OWNER/REPO}"; shift 2 ;;
-    --ref) ref="${2:?--ref requires a value}"; shift 2 ;;
-    --target) target="${2:?--target requires a path}"; shift 2 ;;
+    --repo) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; repository="$2"; shift 2 ;;
+    --ref) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; ref="$2"; shift 2 ;;
+    --target) [ "$#" -ge 2 ] || { usage >&2; exit 2; }; target="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
 
-[[ "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
-  { echo "A valid --repo OWNER/REPO is required." >&2; exit 1; }
-[[ "${ref}" =~ ^[A-Za-z0-9._/-]+$ && "${ref}" != *".."* ]] ||
-  { echo "Invalid ref." >&2; exit 1; }
-[[ "${target}" == /volume1/docker/* && "${target}" != /volume1/docker/ ]] ||
-  { echo "Target must be a named directory below /volume1/docker." >&2; exit 1; }
+case "$repository" in
+  */*) ;;
+  *) echo "Repository must use OWNER/REPO format." >&2; exit 1 ;;
+esac
+case "$repository" in *[!A-Za-z0-9_.\/-]*) echo "Invalid repository." >&2; exit 1 ;; esac
+case "$ref" in ""|*[!A-Za-z0-9._\/-]*|*".."*) echo "Invalid ref." >&2; exit 1 ;; esac
+case "$target" in
+  /volume[0-9]*/docker/) echo "Target must include a project directory name." >&2; exit 1 ;;
+  /volume[0-9]*/docker/*) ;;
+  *) echo "Target must be a named directory below /volumeN/docker." >&2; exit 1 ;;
+esac
+case "$target" in *"/../"*|*"/.."|*"/./"*|*"/.") echo "Invalid target." >&2; exit 1 ;; esac
 
-for command in curl unzip openssl find; do
-  command -v "${command}" >/dev/null ||
-    { echo "Missing command: ${command}" >&2; exit 1; }
+for command in curl tar openssl sed id mktemp date mkdir mv cp rm chmod dirname; do
+  command -v "$command" >/dev/null 2>&1 ||
+    { echo "Missing command: $command" >&2; exit 1; }
 done
 
-work="$(mktemp -d "/tmp/meme-origin-zip.XXXXXXXX")"
+work="$(mktemp -d "${TMPDIR:-/tmp}/meme-origin.XXXXXXXX")"
 cleanup() {
-  case "${work}" in
-    /tmp/meme-origin-zip.*) rm -rf -- "${work}" ;;
+  case "$work" in
+    /tmp/meme-origin.*|*/meme-origin.*) rm -rf "$work" ;;
   esac
 }
-trap cleanup EXIT
+trap cleanup EXIT HUP INT TERM
 
-archive="${work}/repository.zip"
-url="https://github.com/${repository}/archive/${ref}.zip"
+archive="$work/repository.tar.gz"
+unpacked="$work/unpacked"
+mkdir -p "$unpacked"
+url="https://github.com/${repository}/archive/refs/heads/${ref}.tar.gz"
 echo "Downloading ${repository}@${ref} without Git..."
-curl --fail --location --retry 3 --output "${archive}" "${url}"
-unzip -q "${archive}" -d "${work}/unpacked"
-mapfile -t manifests < <(find "${work}/unpacked" -type f -path '*/origin/package.json')
-[[ "${#manifests[@]}" -eq 1 ]] ||
-  { echo "Archive must contain exactly one origin/package.json." >&2; exit 1; }
-source_dir="$(dirname "${manifests[0]}")"
+curl --fail --location --retry 3 --output "$archive" "$url"
+tar -xzf "$archive" -C "$unpacked"
+
+set -- "$unpacked"/*/origin/package.json
+[ "$#" -eq 1 ] && [ -f "$1" ] ||
+  { echo "Archive must contain one origin/package.json." >&2; exit 1; }
+source_dir="$(dirname "$1")"
 for required in package.json package-lock.json Dockerfile compose.yaml .dockerignore .env.example src; do
-  [[ -e "${source_dir}/${required}" ]] ||
-    { echo "Archive is missing origin/${required}." >&2; exit 1; }
+  [ -e "$source_dir/$required" ] ||
+    { echo "Archive is missing origin/$required." >&2; exit 1; }
 done
 
-mkdir -p -- "${target}" "${target}/data" "${target}/logs" "${target}/backups"
-target_real="$(realpath "${target}")"
-[[ "${target_real}" == /volume1/docker/* && "${target_real}" != /volume1/docker/ ]] ||
-  { echo "Resolved target escaped /volume1/docker." >&2; exit 1; }
+mkdir -p "$target" "$target/data" "$target/logs" "$target/backups"
+stamp="$(date -u +%Y%m%d%H%M%S)"
+backup="$target/backups/$stamp"
+mkdir -p "$backup"
 
-stamp="$(date -u +%Y%m%d%H%M%S)-$$"
-backup="${target}/backups/${stamp}"
-mkdir -p -- "${backup}"
 for item in package.json package-lock.json Dockerfile compose.yaml .dockerignore .env.example src; do
-  if [[ -e "${target}/${item}" ]]; then mv -- "${target}/${item}" "${backup}/${item}"; fi
-  cp -a -- "${source_dir}/${item}" "${target}/${item}"
+  if [ -e "$target/$item" ]; then mv "$target/$item" "$backup/$item"; fi
+  cp -R "$source_dir/$item" "$target/$item"
 done
 
-if [[ ! -f "${target}/.env" ]]; then
+if [ ! -f "$target/.env" ]; then
   token="$(openssl rand -hex 32)"
   sed \
     -e "s|replace-with-at-least-32-random-characters|${token}|" \
     -e "s|^PUID=.*|PUID=$(id -u)|" \
     -e "s|^PGID=.*|PGID=$(id -g)|" \
-    -e "s|^MEME_HOST_ROOT=.*|MEME_HOST_ROOT=${target_real}|" \
-    "${source_dir}/.env.example" >"${target}/.env"
-  chmod 0600 "${target}/.env"
+    -e "s|^MEME_HOST_ROOT=.*|MEME_HOST_ROOT=${target}|" \
+    "$source_dir/.env.example" >"$target/.env"
+  chmod 0600 "$target/.env"
   unset token
 fi
 
-echo "Installed project files in ${target_real}."
-echo "In Synology Container Manager, add a Project using ${target_real}/compose.yaml."
-echo "On update, rebuild and recreate the project; .env, data, and logs are preserved."
+echo "Installed project files in $target."
+echo "Create or rebuild the Container Manager project using $target/compose.yaml."
+echo ".env, data, and logs are preserved during updates."
