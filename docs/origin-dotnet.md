@@ -5,6 +5,8 @@
 
 - 기본 수신 주소: `http://127.0.0.1:8087`
 - 배포 형태: .NET 10 `linux-x64` self-contained 실행 파일
+- SDK 준비: 패키지 관리자 없이 `~/.dotnet`에 자동 설치
+- 직접 설치 조건: x86_64, glibc 2.27 이상
 - systemd unit: `meme-origin-dotnet.service`
 - 상세 설치·업데이트·설정: [origin-dotnet README](../origin-dotnet/README.md)
 

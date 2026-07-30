@@ -14,8 +14,8 @@ while (($#)); do
 done
 
 [[ "${EUID}" -ne 0 ]] || { echo "Run as the login user, not with sudo." >&2; exit 1; }
-for command in git dotnet sudo systemctl curl openssl realpath getent groupadd useradd \
-  install mktemp cut sed uname date readlink sleep cp chmod mv rm unlink; do
+for command in git sudo systemctl curl openssl realpath getent groupadd useradd \
+  install mktemp sed uname date readlink sleep cp chmod mv rm unlink awk getconf tar gzip; do
   command -v "${command}" >/dev/null || { echo "Missing command: ${command}" >&2; exit 1; }
 done
 
@@ -45,8 +45,47 @@ prepare_repo
 origin="$(realpath -e "${clone}/origin-dotnet")"
 [[ "${origin}" == "${clone}/origin-dotnet" ]] || exit 1
 [[ "$(uname -m)" == "x86_64" ]] || { echo "Only Linux x86_64 is supported." >&2; exit 1; }
-dotnet_major="$(dotnet --version | cut -d. -f1)"
-[[ "${dotnet_major}" == "10" ]] || { echo ".NET 10 SDK is required; found $(dotnet --version)." >&2; exit 1; }
+glibc_version="$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}' || true)"
+[[ "${glibc_version}" =~ ^[0-9]+\.[0-9]+$ ]] || {
+  echo "Cannot determine the glibc version required by .NET 10." >&2
+  exit 1
+}
+awk -v version="${glibc_version}" 'BEGIN {
+  split(version, parts, ".")
+  exit !((parts[1] + 0) > 2 || ((parts[1] + 0) == 2 && (parts[2] + 0) >= 27))
+}' || {
+  echo ".NET 10 requires glibc 2.27 or newer; found ${glibc_version}." >&2
+  echo "Use a container with a newer Linux user space on this device." >&2
+  exit 1
+}
+
+dotnet_bin="$(command -v dotnet || true)"
+if [[ -z "${dotnet_bin}" ]] || [[ "$("${dotnet_bin}" --version 2>/dev/null || true)" != 10.* ]]; then
+  dotnet_dir="${HOME}/.dotnet"
+  dotnet_installer="$(mktemp /tmp/dotnet-install.XXXXXXXX.sh)"
+  trap 'rm -f -- "${dotnet_installer:-}"' EXIT
+  curl --fail --location --proto '=https' --tlsv1.2 \
+    --output "${dotnet_installer}" \
+    https://dot.net/v1/dotnet-install.sh
+  chmod 0700 "${dotnet_installer}"
+  bash "${dotnet_installer}" \
+    --channel 10.0 \
+    --quality GA \
+    --architecture x64 \
+    --install-dir "${dotnet_dir}" \
+    --no-path
+  rm -f -- "${dotnet_installer}"
+  trap - EXIT
+  dotnet_bin="${dotnet_dir}/dotnet"
+fi
+[[ -x "${dotnet_bin}" ]] && [[ "$("${dotnet_bin}" --version)" == 10.* ]] || {
+  echo "Failed to install or locate the .NET 10 SDK." >&2
+  exit 1
+}
+export DOTNET_ROOT
+DOTNET_ROOT="$(dirname "$(realpath -e "${dotnet_bin}")")"
+export PATH="${DOTNET_ROOT}:${PATH}"
+echo ".NET SDK: $("${dotnet_bin}" --version) (${DOTNET_ROOT})"
 
 sudo -v
 if ! getent group meme-origin-dotnet >/dev/null; then sudo groupadd --system meme-origin-dotnet; fi
@@ -75,9 +114,9 @@ release_id="$(date -u +%Y%m%d%H%M%S)-$(git -C "${clone}" rev-parse --short=12 HE
 release="/opt/meme-origin-dotnet/releases/${release_id}"
 publish="$(mktemp -d /tmp/meme-origin-dotnet-publish.XXXXXXXX)"
 trap 'rm -rf -- "${publish:-}" "${temp_env:-}"' EXIT
-dotnet restore "${origin}/src/Meme.Origin/Meme.Origin.csproj" \
+"${dotnet_bin}" restore "${origin}/src/Meme.Origin/Meme.Origin.csproj" \
   --runtime linux-x64 --locked-mode
-dotnet publish "${origin}/src/Meme.Origin/Meme.Origin.csproj" \
+"${dotnet_bin}" publish "${origin}/src/Meme.Origin/Meme.Origin.csproj" \
   --configuration Release --runtime linux-x64 --self-contained true \
   -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false \
   --no-restore --output "${publish}"

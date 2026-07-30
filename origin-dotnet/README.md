@@ -19,9 +19,10 @@ Node.js origin과 같은 HTTP 계약을 구현한 독립 대체 서비스다. No
 
 ImageSharp `3.1.12`를 exact pin한다. 이 구성은 개인·비상업 사용을 전제로
 하며, 다른 용도로 배포하기 전에는 Six Labors Split License 조건을 직접
-검토해야 한다. 배포물은 Linux x64 self-contained
-single-file이므로 실행 서버에는 .NET 런타임이 필요 없지만, 현재 설치 스크립트의
-로컬 publish 단계에는 .NET 10 SDK가 필요하다.
+검토해야 한다. 배포물은 Linux x64 self-contained single-file이다. 설치
+스크립트는 시스템 패키지를 사용하지 않고, SDK가 없으면 Microsoft 공식 설치
+스크립트로 로그인 사용자의 `~/.dotnet`에 .NET 10 SDK를 자동 설치한 뒤
+publish한다.
 
 ## 검사
 
@@ -40,8 +41,15 @@ restore로 재현한다.
 `/var/lib/meme-origin-dotnet`은 릴리스와 분리되어 보존되며 healthcheck 실패 시
 이전 `/opt/meme-origin-dotnet/releases/*`로 롤백한다.
 
+J1900 CPU는 x86_64이므로 사용할 수 있지만, .NET 10의 최소 조건인 glibc 2.27
+이상이 필요하다. 스크립트가 먼저 검사하며, 조건 미달이면 파일을 설치하기 전에
+중단한다.
+
 ```bash
-bash origin-dotnet/deploy/install.sh --repo-url https://github.com/OWNER/meme.git
+curl -fL -o /tmp/meme-dotnet-install.sh \
+  https://raw.githubusercontent.com/octopus7/meme/main/origin-dotnet/deploy/install.sh
+bash /tmp/meme-dotnet-install.sh \
+  --repo-url https://github.com/octopus7/meme.git
 ```
 
 이미 clone되어 있다면:
