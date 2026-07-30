@@ -1,4 +1,11 @@
+import deploymentInfo from "./deployment-info.generated.json";
+
 const encoder = new TextEncoder();
+const assetVersion = encodeURIComponent(deploymentInfo.commitSha);
+
+export function assetScript(path: string): string {
+  return `<script src="${path}?v=${assetVersion}" defer></script>`;
+}
 
 export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({
@@ -11,12 +18,12 @@ export function escapeHtml(value: string): string {
 }
 
 export function html(body: string, status = 200): Response {
-  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><body>${body}<footer><small id="deployment-info">배포 정보 확인 중…</small></footer><script src="/assets/deployment.js" defer></script></body></html>`, {
+  return new Response(`<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>meme</title><link rel="stylesheet" href="/assets/app.css?v=${assetVersion}"><body>${body}<footer><small id="deployment-info">배포 정보 확인 중…</small></footer>${assetScript("/assets/deployment.js")}</body></html>`, {
     status,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "private, no-store",
-      "content-security-policy": "default-src 'none'; img-src https:; script-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "content-security-policy": "default-src 'none'; img-src https:; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff"
     }
@@ -24,7 +31,7 @@ export function html(body: string, status = 200): Response {
 }
 
 export function uploadForm(collapsible = false): string {
-  const content = `<form id="upload-form"><p><label>이미지 <input name="image" type="file" accept="image/*" required></label></p><p><label>설명 <input name="description" maxlength="500" required></label></p><button>upload</button></form><p id="upload-message" role="status"></p>`;
+  const content = `<form id="upload-form"><p><label>이미지 <input name="image" type="file" accept="image/*" required></label></p><p><label>설명 <input name="description" maxlength="500" required></label></p><button>upload</button></form><pre id="upload-console" class="upload-console" role="log" aria-live="polite" aria-label="업로드 과정 로그"></pre>`;
   return collapsible ? `<details><summary>upload</summary>${content}</details>` : content;
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { escapeHtml, highlight, html, uploadForm } from "../src/html";
+import { UPLOAD_JS } from "../src/assets";
+import { assetScript, escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
@@ -20,7 +21,8 @@ describe("HTML helpers", () => {
     const body = await response.text();
 
     expect(body).toContain('id="deployment-info"');
-    expect(body).toContain('src="/assets/deployment.js"');
+    expect(body).toContain('src="/assets/deployment.js?v=development"');
+    expect(body).toContain('href="/assets/app.css?v=development"');
   });
 
   it("renders a collapsed upload form with a visible description label", () => {
@@ -31,5 +33,17 @@ describe("HTML helpers", () => {
     expect(markup).toContain("<summary>upload</summary>");
     expect(markup).toContain('<label>설명 <input name="description"');
     expect(markup).toContain('id="upload-form"');
+    expect(markup).toContain('id="upload-console"');
+    expect(markup).toContain('role="log"');
+  });
+
+  it("versions browser assets and logs every upload phase", () => {
+    expect(assetScript("/assets/upload.js")).toContain("/assets/upload.js?v=development");
+    expect(() => new Function(UPLOAD_JS)).not.toThrow();
+    expect(UPLOAD_JS).toContain("POST /api/images 전송 시작");
+    expect(UPLOAD_JS).toContain("r.status");
+    expect(UPLOAD_JS).toContain("await r.text()");
+    expect(UPLOAD_JS).toContain('log("ERROR"');
+    expect(UPLOAD_JS).toContain('log("DONE"');
   });
 });
