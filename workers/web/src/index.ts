@@ -106,12 +106,14 @@ function sameOriginForm(request: Request): boolean {
   const origin = request.headers.get("origin");
   if (origin !== null) return origin === expected;
   const referer = request.headers.get("referer");
-  if (referer === null) return false;
-  try {
-    return new URL(referer).origin === expected;
-  } catch {
-    return false;
+  if (referer !== null) {
+    try {
+      return new URL(referer).origin === expected;
+    } catch {
+      return false;
+    }
   }
+  return request.headers.get("sec-fetch-site") === "same-origin";
 }
 
 function decodeHeader(request: Request, name: string): string {

@@ -35,7 +35,7 @@ export function html(body: string, status = 200, showDeploymentInfo = true): Res
       "content-type": "text/html; charset=utf-8",
       "cache-control": "private, no-store",
       "content-security-policy": "default-src 'none'; img-src https:; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-      "referrer-policy": "no-referrer",
+      "referrer-policy": "same-origin",
       "x-content-type-options": "nosniff"
     }
   });

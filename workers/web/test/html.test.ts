@@ -4,6 +4,10 @@ import { allLink, assetScript, assetStyle, escapeHtml, highlight, html, uploadFo
 import { searchTerms } from "../src/db";
 
 describe("HTML helpers", () => {
+  it("allows same-origin form Referer without leaking it cross-origin", () => {
+    expect(html("ok").headers.get("referrer-policy")).toBe("same-origin");
+  });
+
   it("escapes untrusted text", () => {
     expect(escapeHtml(`<img src=x onerror="x">`)).toBe("&lt;img src=x onerror=&quot;x&quot;&gt;");
   });

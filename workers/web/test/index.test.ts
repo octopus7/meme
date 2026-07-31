@@ -315,6 +315,40 @@ describe("authenticated web worker", () => {
     expect(saved).toEqual(["true"]);
   });
 
+  it("accepts same-origin Fetch Metadata when privacy settings omit Origin and Referer", async () => {
+    let saved: unknown[] = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = () => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        saved = values;
+        return statement;
+      };
+      statement.run = async <T>() => Object.create(null) as D1Result<T>;
+      return statement;
+    };
+    const env = Object.assign({}, authEnv, { DB: db });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/admin/settings", {
+        method: "POST",
+        headers: {
+          cookie: `__Host-meme_session=${session}`,
+          "sec-fetch-site": "same-origin"
+        },
+        body: new URLSearchParams({ allow_external: "on" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(303);
+    expect(saved).toEqual(["true"]);
+  });
+
   it("rejects administrator setting changes without an exact Origin", async () => {
     const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
     const session = await createSessionValue({
