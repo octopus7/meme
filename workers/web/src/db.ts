@@ -1,7 +1,6 @@
 import type { StoredBlob } from "./types";
 
 const LEGACY_OWNER_SUB = "public";
-const LEGACY_OWNER_EMAIL = "public@localhost";
 
 export interface ImageRow {
   id: string;
@@ -43,53 +42,41 @@ function likePattern(term: string): string {
   return `%${term.replace(/[\\%_]/g, "\\$&")}%`;
 }
 
-export async function search(env: Env, query: string, limit: number): Promise<ImageRow[]> {
+export async function search(env: Env, ownerSub: string, query: string, limit: number): Promise<ImageRow[]> {
   const terms = searchTerms(query);
   if (!terms.length) return [];
   const clauses = terms.map(() => "(i.description LIKE ? ESCAPE '\\' OR i.original_filename LIKE ? ESCAPE '\\')");
-  const params: unknown[] = [];
+  const params: unknown[] = [ownerSub];
   for (const term of terms) params.push(likePattern(term), likePattern(term));
   params.push(limit);
   const result = await env.DB.prepare(
     `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
      FROM image_items i JOIN blobs b ON b.hash = i.blob_hash
      WHERE b.state = 'active'
-       AND i.id = (
-         SELECT duplicate.id FROM image_items duplicate
-         WHERE duplicate.blob_hash=i.blob_hash
-         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
-       )
+       AND i.owner_sub = ?
        AND ${clauses.join(" AND ")}
      ORDER BY i.created_at DESC, i.id DESC LIMIT ?`
   ).bind(...params).all<ImageRow>();
   return result.results;
 }
 
-export async function list(env: Env, cursor: string | null, limit: number): Promise<ImageRow[]> {
+export async function list(env: Env, ownerSub: string, cursor: string | null, limit: number): Promise<ImageRow[]> {
   const decoded = cursor ? decodeCursor(cursor) : null;
   const sql = decoded
     ? `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
        WHERE b.state='active'
-       AND i.id = (
-         SELECT duplicate.id FROM image_items duplicate
-         WHERE duplicate.blob_hash=i.blob_hash
-         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
-       )
+       AND i.owner_sub=?
        AND (i.created_at < ? OR (i.created_at = ? AND i.id < ?))
        ORDER BY i.created_at DESC, i.id DESC LIMIT ?`
     : `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
        WHERE b.state='active'
-       AND i.id = (
-         SELECT duplicate.id FROM image_items duplicate
-         WHERE duplicate.blob_hash=i.blob_hash
-         ORDER BY duplicate.created_at, duplicate.id LIMIT 1
-       )
+       AND i.owner_sub=?
        ORDER BY i.created_at DESC, i.id DESC LIMIT ?`;
   const values = decoded
-    ? [decoded.createdAt, decoded.createdAt, decoded.id, limit]
-    : [limit];
+    ? [ownerSub, decoded.createdAt, decoded.createdAt, decoded.id, limit]
+    : [ownerSub, limit];
   const result = await env.DB.prepare(sql).bind(...values).all<ImageRow>();
   return result.results;
 }
@@ -195,12 +182,38 @@ function decodeCursor(cursor: string): { createdAt: string; id: string } {
   }
 }
 
-export async function addItem(env: Env, blob: StoredBlob, description: string, filename: string): Promise<string> {
+export async function adoptLegacyItems(env: Env, ownerSub: string, ownerEmail: string): Promise<void> {
+  const legacy = await env.DB.prepare(
+    "SELECT 1 AS found FROM image_items WHERE owner_sub=? LIMIT 1",
+  ).bind(LEGACY_OWNER_SUB).first<{ found: number }>();
+  if (!legacy) return;
+  await env.DB.batch([
+    env.DB.prepare(
+      `DELETE FROM image_items
+       WHERE owner_sub=? AND EXISTS (
+         SELECT 1 FROM image_items owned
+         WHERE owned.owner_sub=? AND owned.blob_hash=image_items.blob_hash
+       )`,
+    ).bind(LEGACY_OWNER_SUB, ownerSub),
+    env.DB.prepare(
+      "UPDATE image_items SET owner_sub=?, owner_email=? WHERE owner_sub=?",
+    ).bind(ownerSub, ownerEmail, LEGACY_OWNER_SUB),
+  ]);
+}
+
+export async function addItem(
+  env: Env,
+  ownerSub: string,
+  ownerEmail: string,
+  blob: StoredBlob,
+  description: string,
+  filename: string,
+): Promise<string> {
   const current = await env.DB.prepare("SELECT state FROM blobs WHERE hash=?").bind(blob.hash).first<{ state: string }>();
   if (current && current.state !== "active") throw new Error("Blob is not active");
   const existing = await env.DB.prepare(
-    "SELECT id FROM image_items WHERE blob_hash=? ORDER BY created_at, id LIMIT 1"
-  ).bind(blob.hash).first<{ id: string }>();
+    "SELECT id FROM image_items WHERE owner_sub=? AND blob_hash=?"
+  ).bind(ownerSub, blob.hash).first<{ id: string }>();
   if (existing) {
     await env.DB.prepare(
       "UPDATE image_items SET description=?, original_filename=? WHERE id=?"
@@ -220,10 +233,10 @@ export async function addItem(env: Env, blob: StoredBlob, description: string, f
        VALUES(?, ?, ?, ?, ?, ?)
        ON CONFLICT(owner_sub, blob_hash) DO UPDATE SET
          description=excluded.description, original_filename=excluded.original_filename`
-    ).bind(id, LEGACY_OWNER_SUB, LEGACY_OWNER_EMAIL, blob.hash, description, filename)
+    ).bind(id, ownerSub, ownerEmail, blob.hash, description, filename)
   ]);
   const row = await env.DB.prepare("SELECT id FROM image_items WHERE owner_sub=? AND blob_hash=?")
-    .bind(LEGACY_OWNER_SUB, blob.hash).first<{ id: string }>();
+    .bind(ownerSub, blob.hash).first<{ id: string }>();
   if (!row) throw new Error("Failed to store image metadata");
   return row.id;
 }

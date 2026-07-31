@@ -25,6 +25,11 @@ Environment variable로 관리합니다. `GOOGLE_CLIENT_SECRET`과
 접근할 수 있고 관리자 화면에서 일반 Google 회원의 접근 허용 여부를 전역으로
 설정합니다. 자세한 발급 및 URL 설정은 `docs/google-oauth.md`를 참고합니다.
 
+각 업로드는 Google `sub`를 소유자 식별자로 저장합니다. `/all`과 `/search`는
+현재 로그인한 사용자의 항목만 반환합니다. 소유권 기능 도입 전에 생성된 기존
+`public` 항목은 관리자가 처음 목록, 검색 또는 업로드를 사용할 때 관리자 계정으로
+귀속됩니다. 이미지 URL 자체는 비공개 주소로 전환하지 않습니다.
+
 `STORAGE_ADMIN` 서비스 바인딩 계약은 다음과 같습니다.
 
 - `POST /internal/v1/blobs`: 이미지 스트림을 받고

@@ -2,6 +2,7 @@ import { ADMIN_CSS, ALL_JS, APP_CSS, DEPLOYMENT_JS, LOGS_JS, SEARCH_JS, UPLOAD_J
 import { authenticate, configuredAdminEmail, isAdministrator, type SessionClaims } from "./auth";
 import {
   addItem,
+  adoptLegacyItems,
   encodeCursor,
   externalMembersAllowed,
   list,
@@ -134,7 +135,7 @@ function validBlob(value: unknown): value is StoredBlob {
     && typeof blob.size === "number" && Number.isSafeInteger(blob.size) && blob.size >= 0;
 }
 
-async function upload(request: Request, env: Env): Promise<Response> {
+async function upload(request: Request, env: Env, owner: SessionClaims): Promise<Response> {
   if (!sameOrigin(request)) return json({ error: "Forbidden origin" }, 403);
   const length = Number(request.headers.get("content-length"));
   const max = Number(env.MAX_UPLOAD_BYTES ?? "20971520");
@@ -171,7 +172,7 @@ async function upload(request: Request, env: Env): Promise<Response> {
   const value: unknown = await storageResponse.json();
   if (!validBlob(value)) return json({ error: "Invalid response from image storage" }, 502);
   try {
-    const id = await addItem(env, value, description, filename);
+    const id = await addItem(env, owner.sub, owner.email, value, description, filename);
     return json({ id, hash: value.hash }, 201);
   } catch (error) {
     console.error(JSON.stringify({ event: "metadata_write_failed", hash: value.hash, error: String(error) }));
@@ -179,13 +180,14 @@ async function upload(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function removeImage(id: string, request: Request, env: Env): Promise<Response> {
+async function removeImage(id: string, request: Request, env: Env, ownerSub: string): Promise<Response> {
   if (!sameOrigin(request)) return json({ error: "Forbidden origin" }, 403);
-  const row = await env.DB.prepare("SELECT blob_hash FROM image_items WHERE id=?")
-    .bind(id).first<{ blob_hash: string }>();
+  const row = await env.DB.prepare(
+    "SELECT blob_hash FROM image_items WHERE id=? AND (owner_sub=? OR owner_sub='public')",
+  ).bind(id, ownerSub).first<{ blob_hash: string }>();
   if (!row) return json({ error: "Not found" }, 404);
 
-  await env.DB.prepare("DELETE FROM image_items WHERE blob_hash=?").bind(row.blob_hash).run();
+  await env.DB.prepare("DELETE FROM image_items WHERE id=?").bind(id).run();
   await env.DB.prepare(
     `UPDATE blobs SET state='trash_pending'
      WHERE hash=? AND state='active'
@@ -253,16 +255,20 @@ async function route(request: Request, env: Env, session: SessionClaims | null):
     return html(`<main class="search-page"><form role="search"><input name="q" aria-label="검색어" autocomplete="off"></form><p>${allLink()}</p><div id="results" class="search-grid" aria-live="polite"></div></main>${assetScript("/assets/search.js")}`, 200, false);
   }
   if (request.method === "GET" && url.pathname === "/api/search") {
+    if (!session) return json({ error: "Authentication required" }, 401);
+    if (administrator) await adoptLegacyItems(env, session.sub, session.email);
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 200);
     if (!query) return new Response("", { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store" } });
-    const rows = await search(env, query, SEARCH_RESULT_LIMIT);
+    const rows = await search(env, session.sub, query, SEARCH_RESULT_LIMIT);
     const body = rows.map((row) => imageMarkup(row, env, searchTerms(query))).join("");
     return new Response(body, { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
   }
   if (request.method === "GET" && url.pathname === "/all") {
+    if (!session) return json({ error: "Authentication required" }, 401);
+    if (administrator) await adoptLegacyItems(env, session.sub, session.email);
     let rows: ImageRow[];
     try {
-      rows = await list(env, url.searchParams.get("cursor"), 51);
+      rows = await list(env, session.sub, url.searchParams.get("cursor"), 51);
     } catch {
       return html("<p>잘못된 페이지 주소입니다.</p>", 400);
     }
@@ -344,12 +350,17 @@ async function route(request: Request, env: Env, session: SessionClaims | null):
   if (request.method === "GET" && url.pathname === "/upload") {
     return html(`<nav><a href="/search">search</a> ${allLink()}</nav><main>${uploadForm()}</main>${assetScript("/assets/upload.js")}`);
   }
-  if (request.method === "POST" && url.pathname === "/api/images") return upload(request, env);
+  if (request.method === "POST" && url.pathname === "/api/images") {
+    if (!session) return json({ error: "Authentication required" }, 401);
+    if (administrator) await adoptLegacyItems(env, session.sub, session.email);
+    return upload(request, env, session);
+  }
   const match = /^\/api\/images\/([0-9a-f-]{36})$/u.exec(url.pathname);
   if (request.method === "DELETE" && match?.[1]) {
     if (!administrator) return json({ error: "Not found" }, 404);
     if (request.headers.get("origin") !== url.origin) return json({ error: "Forbidden origin" }, 403);
-    return removeImage(match[1], request, env);
+    if (!session) return json({ error: "Authentication required" }, 401);
+    return removeImage(match[1], request, env, session.sub);
   }
   return json({ error: "Not found" }, 404);
 }

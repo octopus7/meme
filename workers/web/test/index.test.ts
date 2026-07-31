@@ -152,8 +152,10 @@ describe("authenticated web worker", () => {
         changes: 0
       }
     });
+    statement.first = async <T>() => null as T;
     const db = Object.create(null) as D1Database;
     db.prepare = () => statement;
+    db.batch = async <T>(statements: D1PreparedStatement[]) => statements.map(() => Object.create(null) as D1Result<T>);
     const env = Object.assign({}, authEnv, { DB: db });
     const session = await createSessionValue({
       sub: "google-user-id",
@@ -201,6 +203,36 @@ describe("authenticated web worker", () => {
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ error: "Not found" });
     }
+  });
+
+  it("passes the authenticated member id into list and search queries", async () => {
+    const queries: Array<{ sql: string; values: unknown[] }> = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        queries.push({ sql, values });
+        return statement;
+      };
+      statement.first = async <T>() => ({ value: "true" }) as T;
+      statement.all = async <T>() => ({ success: true, results: [] as T[], meta: Object.create(null) });
+      return statement;
+    };
+    const env = Object.assign({}, authEnv, { DB: db });
+    const session = await createSessionValue({
+      sub: "member-user-id",
+      email: "member@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const headers = { cookie: `__Host-meme_session=${session}` };
+
+    expect((await worker.fetch(new Request("https://meme.example/all", { headers }), env)).status).toBe(200);
+    expect((await worker.fetch(new Request("https://meme.example/api/search?q=cat", { headers }), env)).status).toBe(200);
+
+    expect(queries.some(({ sql, values }) => sql.includes("i.owner_sub=?")
+      && values[0] === "member-user-id" && values.at(-1) === 51)).toBe(true);
+    expect(queries.some(({ sql, values }) => sql.includes("i.owner_sub = ?")
+      && values[0] === "member-user-id" && values.at(-1) === 100)).toBe(true);
   });
 
   it("immediately rejects an external member when external login is disabled", async () => {
@@ -402,6 +434,48 @@ describe("authenticated web worker", () => {
     );
 
     expect(response.status).toBe(403);
+  });
+
+  it("deletes only the administrator's item row, not every owner of the blob", async () => {
+    const hash = "a".repeat(64);
+    const queries: Array<{ sql: string; values: unknown[] }> = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        queries.push({ sql, values });
+        return statement;
+      };
+      statement.first = async <T>() => (
+        sql.startsWith("SELECT blob_hash") ? { blob_hash: hash } : { state: "active" }
+      ) as T;
+      statement.run = async <T>() => Object.create(null) as D1Result<T>;
+      return statement;
+    };
+    const env = Object.assign({}, authEnv, { DB: db });
+    const session = await createSessionValue({
+      sub: "admin-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const id = "00000000-0000-0000-0000-000000000000";
+    const response = await worker.fetch(
+      new Request(`https://meme.example/api/images/${id}`, {
+        method: "DELETE",
+        headers: {
+          cookie: `__Host-meme_session=${session}`,
+          origin: "https://meme.example"
+        }
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(queries).toContainEqual({
+      sql: "DELETE FROM image_items WHERE id=?",
+      values: [id]
+    });
+    expect(queries.some(({ sql }) => sql === "DELETE FROM image_items WHERE blob_hash=?")).toBe(false);
   });
 
   it("renders log rows and statistics for the administrator", async () => {

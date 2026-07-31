@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { addItem, mediaRequestLogs, purgeExpiredMediaRequestLogs } from "../src/db";
+import { addItem, adoptLegacyItems, list, mediaRequestLogs, purgeExpiredMediaRequestLogs, search } from "../src/db";
 
-describe("public collection metadata", () => {
-  it("updates only the representative row for a legacy duplicate blob", async () => {
+describe("owned collection metadata", () => {
+  it("updates only the current owner's row for a duplicate blob", async () => {
     const statements: Array<{ sql: string; values: unknown[] }> = [];
     const prepare = vi.fn((sql: string): D1PreparedStatement => {
       const statement: D1PreparedStatement = Object.create(null);
@@ -22,7 +22,7 @@ describe("public collection metadata", () => {
     env.DB = Object.create(null);
     env.DB.prepare = prepare;
 
-    const id = await addItem(env, {
+    const id = await addItem(env, "owner-sub", "owner@example.com", {
       hash: "a".repeat(64),
       extension: "png",
       mimeType: "image/png",
@@ -35,6 +35,57 @@ describe("public collection metadata", () => {
       values: ["updated", "image.png", "representative-id"]
     });
     expect(statements.every(({ sql }) => !sql.includes("UPDATE image_items SET description=?, original_filename=? WHERE blob_hash=?"))).toBe(true);
+    expect(statements).toContainEqual({
+      sql: "SELECT id FROM image_items WHERE owner_sub=? AND blob_hash=?",
+      values: ["owner-sub", "a".repeat(64)]
+    });
+  });
+
+  it("adopts legacy public rows for the authenticated administrator", async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        statements.push({ sql, values });
+        return statement;
+      };
+      statement.first = async <T>() => ({ found: 1 }) as T;
+      return statement;
+    };
+    db.batch = async <T>(batch: D1PreparedStatement[]) => batch.map(() => Object.create(null) as D1Result<T>);
+    const env = Object.assign(Object.create(null), { DB: db }) as Env;
+
+    await adoptLegacyItems(env, "admin-sub", "owner@example.com");
+
+    expect(statements).toHaveLength(3);
+    expect(statements[0]?.values).toEqual(["public"]);
+    expect(statements[1]?.values).toEqual(["public", "admin-sub"]);
+    expect(statements[2]?.values).toEqual(["admin-sub", "owner@example.com", "public"]);
+  });
+
+  it("scopes list and search queries to the current owner", async () => {
+    const queries: Array<{ sql: string; values: unknown[] }> = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        queries.push({ sql, values });
+        return statement;
+      };
+      statement.all = async <T>() => ({ success: true, results: [] as T[], meta: Object.create(null) });
+      return statement;
+    };
+    const env = Object.assign(Object.create(null), { DB: db }) as Env;
+
+    await list(env, "member-sub", null, 51);
+    await search(env, "member-sub", "cat", 100);
+
+    expect(queries).toHaveLength(2);
+    expect(queries[0]?.sql).toContain("i.owner_sub=?");
+    expect(queries[0]?.values).toEqual(["member-sub", 51]);
+    expect(queries[1]?.sql).toContain("i.owner_sub = ?");
+    expect(queries[1]?.values).toEqual(["member-sub", "%cat%", "%cat%", 100]);
   });
 });
 
