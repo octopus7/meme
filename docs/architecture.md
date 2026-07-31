@@ -9,7 +9,7 @@
 flowchart LR
     U["브라우저"]
     subgraph CF["Cloudflare"]
-        W["Google 인증 web Worker<br/>/ → /search<br/>/search · /all · 업로드 · 삭제"]
+        W["Google 인증 web Worker<br/>/ → /all<br/>/search · /all · 업로드 · 삭제"]
         D[("D1<br/>이미지 메타데이터 · 접근 설정<br/>90일 요청·캐시 로그")]
 
         subgraph S["공개 storage Worker"]

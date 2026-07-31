@@ -224,7 +224,7 @@ async function retryPendingTrash(env: Env): Promise<void> {
 async function route(request: Request, env: Env, session: SessionClaims | null): Promise<Response> {
   const url = new URL(request.url);
   const administrator = session !== null && isAdministrator(env, session.email);
-  if (request.method === "GET" && url.pathname === "/") return Response.redirect(new URL("/search", url), 302);
+  if (request.method === "GET" && url.pathname === "/") return Response.redirect(new URL("/all", url), 302);
   if (request.method === "GET" && url.pathname === "/assets/search.js") {
     return new Response(SEARCH_JS, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
   }

@@ -50,6 +50,23 @@ describe("authenticated web worker", () => {
     expect(response.headers.get("set-cookie")).toBeNull();
   });
 
+  it("lands an authenticated root request on the user's collection", async () => {
+    const session = await createSessionValue({
+      sub: "google-user-id",
+      email: "owner@example.com",
+      exp: Math.floor(Date.now() / 1000) + 60
+    }, authEnv.AUTH_SESSION_SECRET);
+    const response = await worker.fetch(
+      new Request("https://meme.example/", {
+        headers: { cookie: `__Host-meme_session=${session}` }
+      }),
+      authEnv
+    );
+
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe("https://meme.example/all");
+  });
+
   it("redirects to Google only after the login button is used", async () => {
     const response = await worker.fetch(
       new Request("https://meme.example/auth/login?return_to=%2Fsearch"),
