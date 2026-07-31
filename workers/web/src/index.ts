@@ -101,6 +101,19 @@ function sameOrigin(request: Request): boolean {
   return origin === null || origin === new URL(request.url).origin;
 }
 
+function sameOriginForm(request: Request): boolean {
+  const expected = new URL(request.url).origin;
+  const origin = request.headers.get("origin");
+  if (origin !== null) return origin === expected;
+  const referer = request.headers.get("referer");
+  if (referer === null) return false;
+  try {
+    return new URL(referer).origin === expected;
+  } catch {
+    return false;
+  }
+}
+
 function decodeHeader(request: Request, name: string): string {
   const value = request.headers.get(name) ?? "";
   try {
@@ -271,7 +284,7 @@ async function route(request: Request, env: Env, session: SessionClaims | null):
   }
   if (request.method === "POST" && url.pathname === "/admin/settings") {
     if (!administrator) return json({ error: "Not found" }, 404);
-    if (request.headers.get("origin") !== url.origin) return json({ error: "Forbidden origin" }, 403);
+    if (!sameOriginForm(request)) return json({ error: "Forbidden origin" }, 403);
     const lengthHeader = request.headers.get("content-length");
     const length = lengthHeader === null ? null : Number(lengthHeader);
     if ((length !== null && (!Number.isSafeInteger(length) || length < 1 || length > 1024))
