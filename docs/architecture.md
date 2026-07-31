@@ -3,6 +3,12 @@
 이 문서는 배포 단위와 네트워크 경계를 한눈에 확인하기 위한 운영용 개요입니다. 실제
 계정 ID, 도메인, 데이터베이스 ID, 토큰은 저장소에 기록하지 않습니다.
 
+## Presentation overview
+
+![meme private image platform architecture](assets/meme-architecture-presentation.png)
+
+This slide-ready overview highlights the service and network boundaries. The Mermaid diagram below remains the detailed operational reference.
+
 ## 전체 구조
 
 ```mermaid
