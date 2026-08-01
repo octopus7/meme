@@ -1,33 +1,35 @@
-# Node.js 24 Docker origin 설치
+# Node.js 24 Docker origin
 
-Node origin은 Node.js 24 LTS와 `sharp`로 이미지를 처리합니다. Synology/XPEnology에서는
-DSM에 Node.js와 native 라이브러리를 직접 설치하는 방식보다 **Container Manager
-(Docker)** 사용을 권장합니다. 컨테이너는 Debian Bookworm 기반
-`node:24-bookworm-slim`을 사용하고 외부에는 loopback `8086`만 엽니다.
+[한국어](origin.ko.md) | **English**
 
-## 권장 환경
+The image origin processes uploads with Node.js 24 LTS and `sharp`. On
+Synology/XPEnology, use Container Manager (Docker) instead of installing Node.js
+and native libraries directly on DSM. The container is based on
+`node:24-bookworm-slim` and exposes only loopback port `8086`.
 
-- x86-64 Synology/XPEnology와 Container Manager 또는 Docker Compose
-- `/volume1/docker/meme-origin`에 대한 읽기·쓰기 권한
-- 데이터와 로그를 위한 별도 백업
-- Cloudflare Tunnel의 `img.example.com` 및 `origin-admin.example.com` route가
-  `http://127.0.0.1:8086`에 접근할 수 있는 구성
+## Recommended environment
 
-지원 런타임은 Docker 이미지 안의 Node.js 24 LTS입니다. 빌드·테스트와 실행이
-DSM 자체 Node 버전에 의존하지 않습니다.
+- x86-64 Synology/XPEnology with Container Manager or Docker Compose
+- Read/write access to `/volume1/docker/meme-origin`
+- Separate backups for image data and logs
+- Cloudflare Tunnel routes for `img.example.com` and `origin-admin.example.com`
+  reaching `http://127.0.0.1:8086`
 
-## GitHub에서 설치 파일 받기
+The supported runtime is Node.js 24 LTS inside the Docker image. Build, test, and
+runtime behavior do not depend on the Node.js version installed on DSM.
 
-Git 없이 공개 GitHub archive에서 `origin/`만 설치하거나 업데이트할 수 있습니다.
+## Install or update from GitHub
+
+The deployment script downloads only `origin/` without requiring Git.
 
 ```bash
 curl --fail --location --output /tmp/deploy-latest-from-github.sh \
   https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/deploy-latest-from-github.sh
 ```
 
-기본 대상은 `/volume1/docker/meme-origin`입니다. 이 스크립트는 최신 `main` 커밋
-SHA를 기록하고 Docker 이미지를 build/recreate한 뒤 `/healthz`가 응답할 때까지
-기다립니다. 실제 기본 배포 명령은 다음과 같습니다.
+The default target is `/volume1/docker/meme-origin`. The script records the
+latest `main` commit SHA, builds and recreates the Docker image, and waits for
+`/healthz`. Run the standard deployment with:
 
 ```bash
 sh /tmp/deploy-latest-from-github.sh \
@@ -36,13 +38,12 @@ sh /tmp/deploy-latest-from-github.sh \
   --target /volume1/docker/meme-origin
 ```
 
-스크립트는 저장소 전체를 배포하지 않고 `origin/`만 교체합니다. 최초 실행 시
-`.env`를 만들고, 업데이트 시 `.env`, `data/`, `logs/`를 보존하며 이전 애플리케이션
-파일은 `backups/`에 남깁니다. Worker를 배포하거나 D1 migration을 실행하지 않습니다.
+The script preserves `.env`, `data/`, and `logs/`, and keeps previous application
+files under `backups/`. It does not deploy Workers or run D1 migrations.
 
-## Container Manager 프로젝트 생성
+## Container Manager project
 
-설치 디렉터리에서 환경 파일과 영속 디렉터리를 준비합니다.
+For a manual first-time setup, prepare the environment and persistent folders:
 
 ```bash
 cd /volume1/docker/meme-origin
@@ -53,75 +54,74 @@ chmod 0600 .env
 mkdir -p data logs
 ```
 
-`.env`에서 다음을 확인합니다.
+In `.env`:
 
-- mutation token을 32자 이상의 무작위 값으로 교체
-- `PUID`와 `PGID`를 `data/`, `logs/` 소유 DSM 사용자 값으로 설정
-- `MEME_HOST_ROOT=/volume1/docker/meme-origin`
+- Replace the mutation token with a random value of at least 32 characters.
+- Set `PUID` and `PGID` to the DSM user that owns `data/` and `logs/`.
+- Set `MEME_HOST_ROOT=/volume1/docker/meme-origin`.
 
-같은 mutation token을 web Worker의 Cloudflare encrypted secret
-`ORIGIN_ADMIN_TOKEN`에 등록합니다. `origin-admin.example.com`은 Cloudflare
-Access Service Auth 뒤에 두고, web Worker가 Access service token과 이 mutation
-token을 모두 보냅니다. 실제 `.env`, token, 이미지와 로그는 커밋하지 않습니다.
+Register the same mutation token as the web Worker secret
+`ORIGIN_ADMIN_TOKEN`. Keep `origin-admin.example.com` behind Cloudflare Access
+Service Auth; the web Worker sends both the Access service token and the origin
+mutation token. Never commit `.env`, tokens, images, or logs.
 
-Synology Container Manager에서:
+In Synology Container Manager:
 
-1. **Project → Create**를 선택합니다.
-2. project 경로를 `/volume1/docker/meme-origin`으로 지정합니다.
-3. `compose.yaml`을 선택해 build하고 시작합니다.
-4. 컨테이너 health 상태와 아래 endpoint를 확인합니다.
+1. Select **Project → Create**.
+2. Set the project path to `/volume1/docker/meme-origin`.
+3. Select `compose.yaml`, then build and start the project.
+4. Check the container health and endpoint:
 
 ```bash
 curl --fail http://127.0.0.1:8086/healthz
 ```
 
-Compose 구성은 다음 안전 경계를 적용합니다.
+The response includes the deployed commit, for example:
 
-- host binding `127.0.0.1:8086`
-- `data/`와 `logs/`만 영속 bind mount
-- read-only container filesystem과 private `/tmp`
-- Linux capabilities 제거와 `no-new-privileges`
-- `restart: unless-stopped` 및 application health check
-
-라우터 port forwarding으로 8086이나 mutation API를 인터넷에 공개하지 않습니다.
-공개 이미지 hostname에는 `/i/*`, `/t/*`의 GET/HEAD만 연결하고
-`/internal/*`와 `/healthz`는 차단합니다. 관리 요청은 Access 보호
-`origin-admin.example.com`을 통해서만 도달해야 합니다.
-
-## 업데이트
-
-동일한 설치 스크립트를 다시 실행한 뒤 Container Manager에서 project의
-**Build**와 **Recreate**를 수행합니다.
-
-```bash
-sh /tmp/install-meme-origin.sh
+```json
+{"status":"ok","commit":"ddf849ab7026bcecf7b9ac5eb468a2b1fd086f03"}
 ```
 
-업데이트 전 `data/`, `.env`와 로그를 백업합니다. `/healthz` 응답에는 배포된
-커밋 SHA가 포함되며, 새 컨테이너 health check가
-실패하면 `backups/`의 이전 애플리케이션 파일을 복구해 다시 build합니다. 데이터와
-환경 파일은 rollback하거나 삭제하지 않습니다.
+The Compose configuration applies these safety boundaries:
+
+- Host binding on `127.0.0.1:8086`
+- Only `data/` and `logs/` as persistent bind mounts
+- Read-only container filesystem and private `/tmp`
+- Dropped Linux capabilities and `no-new-privileges`
+- `restart: unless-stopped` and an application health check
+
+Do not expose port 8086 or mutation APIs through router port forwarding. The
+public image hostname may expose only GET/HEAD for `/i/*` and `/t/*`; block
+`/internal/*` and `/healthz`. Management requests must use the Access-protected
+`origin-admin.example.com` hostname.
+
+## Updates and rollback
+
+Run `deploy-latest-from-github.sh` again for updates. It backs up the previous
+application files before replacing them and preserves `.env`, `data/`, and
+`logs/`. The `/healthz` response includes the deployed commit SHA. If the new
+container fails its health check, restore the previous application files from
+`backups/` and rebuild. Do not delete or roll back the data and environment files
+without a separate backup decision.
 
 ## GitHub Actions artifact
 
-`Build origin` workflow는 Node.js 24에서 test와 Docker build를 검증하고
-`meme-origin-node24-linux-x64-<commit>` artifact를 만듭니다. artifact에는
-Container Manager 파일과 Linux x64 애플리케이션 의존성이 포함되지만 실제
-환경 파일이나 token은 없습니다.
+The `Build origin` workflow validates Node.js 24 tests and the Docker build, then
+creates `meme-origin-node24-linux-x64-<commit>`. The artifact contains the
+Container Manager files and Linux x64 production dependencies, but no environment
+file or token.
 
-이 workflow는 artifact만 생성하며 NAS에 접속하거나 서버, Worker 또는 D1을
-변경하지 않습니다. 비컨테이너 systemd 설치가 꼭 필요한 경우에는
-[origin README](../origin/README.md)의 fallback 절차를 사용하되 Synology에서는
-Container Manager를 우선합니다.
+The workflow creates an artifact only; it does not connect to the NAS or modify
+the server, Worker, or D1. For a non-container systemd installation, see the
+[origin README](../origin/README.md), but prefer Container Manager on Synology.
 
-## 운영 점검
+## Operations checklist
 
-- Container Manager health, restart 횟수와 image build 실패를 감시합니다.
-- `/healthz`를 제외한 요청이 기록되는 `logs/access-YYYY-MM-DD.log`에
-  Authorization, query, body와 token이 없는지 확인합니다.
-- 만료된 trash 검사는 기본적으로 하루에 한 번 실행됩니다
-  (`MEME_ORIGIN_PURGE_INTERVAL=1d`).
-- 30일이 지난 access log의 gzip 압축과 trash purge를 점검합니다.
-- `data/`의 원본·thumbnail·trash와 `.env`를 별도 백업합니다.
-- `data/`, `logs/` 소유권을 바꿀 때 `PUID`/`PGID`도 함께 검증합니다.
-- Docker image와 Node.js 24 LTS 보안 업데이트를 정기적으로 rebuild해 반영합니다.
+- Monitor Container Manager health, restart counts, and image build failures.
+- Check that `logs/access-YYYY-MM-DD.log` excludes authorization, query strings,
+  request bodies, and tokens.
+- Confirm the daily trash purge (`MEME_ORIGIN_PURGE_INTERVAL=1d`).
+- Check gzip compression of access logs older than 30 days and trash cleanup.
+- Back up active images, thumbnails, trash, and `.env` separately.
+- Recheck `PUID`/`PGID` after changing `data/` or `logs/` ownership.
+- Rebuild regularly for Docker image and Node.js 24 LTS security updates.

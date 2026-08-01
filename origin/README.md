@@ -1,5 +1,7 @@
 # meme-origin
 
+[한국어](README.ko.md) | **English**
+
 Private Node.js image origin for the Meme Workers. It validates JPEG, PNG,
 WebP, and GIF uploads with `sharp`, stores originals by SHA-256, and generates
 autorotated, center-cropped 128×128 WebP thumbnails. Image processing is
