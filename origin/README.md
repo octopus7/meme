@@ -45,7 +45,6 @@ Download the installer once, then point it at the repository:
 ```sh
 curl --fail --location --output /tmp/deploy-latest-from-github.sh \
   https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/deploy-latest-from-github.sh
-sh /tmp/deploy-latest-from-github.sh
 ```
 
 It extracts only `origin/` into `/volume1/docker/meme-origin`, resolves the
@@ -54,11 +53,13 @@ Container Manager project, and waits for `/healthz`. `.env`, `data/`, and `logs/
 are preserved on updates, and previous application files are retained under
 `backups/`. The script does not use Git, Wrangler, Workers, or D1.
 
-For another volume path:
+Run the update for the standard Synology path:
 
 ```sh
-sh /tmp/deploy-latest-from-github.sh --repo octopus7/meme \
-  --target /volume1/docker/my-meme-origin
+sh /tmp/deploy-latest-from-github.sh \
+  --repo octopus7/meme \
+  --ref main \
+  --target /volume1/docker/meme-origin
 ```
 
 ## API

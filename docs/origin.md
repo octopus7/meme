@@ -23,12 +23,11 @@ Git 없이 공개 GitHub archive에서 `origin/`만 설치하거나 업데이트
 ```bash
 curl --fail --location --output /tmp/deploy-latest-from-github.sh \
   https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/deploy-latest-from-github.sh
-sh /tmp/deploy-latest-from-github.sh
 ```
 
 기본 대상은 `/volume1/docker/meme-origin`입니다. 이 스크립트는 최신 `main` 커밋
 SHA를 기록하고 Docker 이미지를 build/recreate한 뒤 `/healthz`가 응답할 때까지
-기다립니다. 다른 volume을 쓰려면 명시합니다.
+기다립니다. 실제 기본 배포 명령은 다음과 같습니다.
 
 ```bash
 sh /tmp/deploy-latest-from-github.sh \
