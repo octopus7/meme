@@ -24,7 +24,7 @@ Linux 서버용 SSH key와 Tunnel token은 어느 Worker Environment에도 넣�
 | variable | `D1_DATABASE_NAME` | D1 표시 이름 |
 | variable | `D1_DATABASE_ID` | D1 database ID |
 | variable | `IMAGE_ORIGIN` | 공개 이미지 origin, 예: `https://img.example.com` |
-| variable | `ORIGIN_ADMIN_BASE_URL` | Access 보호 관리 hostname, 예: `https://origin-admin.example.com` |
+| variable | `ORIGIN_ADMIN_BASE_URL` | Bearer token으로 보호하는 관리 hostname, 예: `https://origin-admin.example.com` |
 | variable | `CF_ZONE_ID` | 이미지 Zone ID |
 | variable | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | variable | `GOOGLE_REDIRECT_URI` | `https://<APP_DOMAIN>/auth/callback` |
@@ -37,11 +37,9 @@ Cloudflare web Worker encrypted secrets:
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret |
 | `AUTH_SESSION_SECRET` | 세션 서명용 무작위 secret |
 | `ORIGIN_ADMIN_TOKEN` | origin `MEME_ORIGIN_MUTATION_TOKEN`과 동일한 bearer token |
-| `CF_ACCESS_CLIENT_ID` | `origin-admin` Access service token ID |
-| `CF_ACCESS_CLIENT_SECRET` | `origin-admin` Access service token secret |
 | `CF_CACHE_PURGE_TOKEN` | 대상 Zone의 Cache Purge만 허용하는 API token |
 
-`ORIGIN_ADMIN_TOKEN`, Access secret, purge token은 GitHub 변수로 만들지 않습니다.
+`ORIGIN_ADMIN_TOKEN`, purge token은 GitHub 변수로 만들지 않습니다.
 배포 workflow는 secret을 출력하거나 `wrangler secret put`으로 덮어쓰지 않고,
 Cloudflare Worker Settings에 등록된 값을 `--keep-vars`로 보존합니다.
 
@@ -66,9 +64,9 @@ GitHub variables로 관리합니다. API token은 반드시 secret으로 관리�
   cache-tag만 허용
 - `d1-production`: Account → D1 → Edit
 
-Tunnel connector와 Access service token은 Cloudflare 대시보드와 Synology에만
-설정합니다. Workers VPC의 `Connectivity Directory Bind`, VPC Service ID,
-storage Worker용 배포 token은 더 이상 필요하지 않습니다.
+Tunnel connector token은 Cloudflare 대시보드와 Synology에만 설정합니다. Workers
+VPC의 `Connectivity Directory Bind`, VPC Service ID, storage Worker용 배포 token은
+더 이상 필요하지 않습니다.
 
 공식 참고:
 
@@ -89,7 +87,7 @@ storage Worker용 배포 token은 더 이상 필요하지 않습니다.
 `.wrangler.generated.jsonc`를 만들고 종료 시 삭제합니다. 해당 파일은 `.gitignore`에도
 포함되어 있습니다.
 
-Custom Domain, Tunnel route, Access application/policy와 Cache Rule 생성은
+Custom Domain, Tunnel route와 Cache Rule 생성은
 workflow가 변경하지 않습니다. Cloudflare 대시보드에서 먼저 만들고 smoke test로
 확인합니다. Worker 배포가 Linux 파일을 복사·삭제하거나 서비스를 재시작하는
 단계도 없습니다.
@@ -110,7 +108,7 @@ column/table 제거는 별도 release로 나눕니다.
 ```text
 additive D1 migration
 → web Worker
-→ smoke test (Tunnel, Access, CDN cache, purge, exposure log)
+→ smoke test (Tunnel, CDN cache, purge, exposure log)
 → 후속 정리 migration
 ```
 
@@ -122,10 +120,8 @@ additive D1 migration
 
 배포 전에 다음을 확인합니다.
 
-1. `ORIGIN_ADMIN_BASE_URL`이 `https://`이고 `origin-admin.example.com`을 가리킵니다.
-2. Access service token ID/secret이 해당 application의 Service Auth 정책에서
-   허용됩니다.
-3. `ORIGIN_ADMIN_TOKEN`이 origin의 mutation token과 일치합니다.
-4. `CF_ZONE_ID`가 `IMAGE_ORIGIN`의 Zone이고, purge token이 해당 Zone의 tag purge만
+1. `ORIGIN_ADMIN_BASE_URL`이 `https://`이고 관리 hostname을 가리킵니다.
+2. `ORIGIN_ADMIN_TOKEN`이 origin의 mutation token과 일치합니다.
+3. `CF_ZONE_ID`가 `IMAGE_ORIGIN`의 Zone이고, purge token이 해당 Zone의 tag purge만
    수행할 수 있습니다.
-5. secret 값이 workflow 로그, generated Wrangler 파일, 커밋에 나타나지 않습니다.
+4. secret 값이 workflow 로그, generated Wrangler 파일, 커밋에 나타나지 않습니다.

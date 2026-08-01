@@ -26,13 +26,11 @@ secret으로 직접 등록합니다.
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SESSION_SECRET`
 - `ORIGIN_ADMIN_TOKEN`
-- `CF_ACCESS_CLIENT_ID`
-- `CF_ACCESS_CLIENT_SECRET`
 - `CF_CACHE_PURGE_TOKEN`
 
 `ORIGIN_ADMIN_TOKEN`은 origin의 `MEME_ORIGIN_MUTATION_TOKEN`과 동일해야 합니다.
-Access service token은 `origin-admin.example.com` application에만 사용하고,
-purge token은 이미지 Zone의 cache-tag purge만 허용합니다. 자세한 발급 및 URL
+`origin-admin.example.com` 관리 요청은 이 bearer token으로 인증하고, purge token은
+이미지 Zone의 cache-tag purge만 허용합니다. 자세한 발급 및 URL
 설정은 `docs/cloudflare.md`, `docs/google-oauth.md`를 참고합니다.
 
 ## 런타임 역할
@@ -52,11 +50,9 @@ purge token은 이미지 Zone의 cache-tag purge만 허용합니다. 자세한 �
 는 web Worker에서 알 수 없습니다.
 
 업로드·삭제·복구 같은 관리 요청은 `ORIGIN_ADMIN_BASE_URL`로 직접 HTTPS fetch합니다.
-web Worker는 다음 헤더를 함께 보냅니다.
+web Worker는 다음 헤더를 보냅니다.
 
 ```http
-CF-Access-Client-Id: <service token id>
-CF-Access-Client-Secret: <service token secret>
 Authorization: Bearer <origin mutation token>
 ```
 

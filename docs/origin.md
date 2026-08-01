@@ -61,9 +61,9 @@ In `.env`:
 - Set `MEME_HOST_ROOT=/volume1/docker/meme-origin`.
 
 Register the same mutation token as the web Worker secret
-`ORIGIN_ADMIN_TOKEN`. Keep `origin-admin.example.com` behind Cloudflare Access
-Service Auth; the web Worker sends both the Access service token and the origin
-mutation token. Never commit `.env`, tokens, images, or logs.
+`ORIGIN_ADMIN_TOKEN`. The `origin-admin.example.com` hostname is public, so keep
+the mutation token long and random; the web Worker sends it as a Bearer token.
+Never commit `.env`, tokens, images, or logs.
 
 In Synology Container Manager:
 
@@ -92,8 +92,8 @@ The Compose configuration applies these safety boundaries:
 
 Do not expose port 8086 or mutation APIs through router port forwarding. The
 public image hostname may expose only GET/HEAD for `/i/*` and `/t/*`; block
-`/internal/*` and `/healthz`. Management requests must use the Access-protected
-`origin-admin.example.com` hostname.
+`/internal/*` and `/healthz`. Management requests must use the
+`origin-admin.example.com` hostname with the Bearer mutation token.
 
 ## Updates and rollback
 

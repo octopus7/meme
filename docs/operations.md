@@ -10,7 +10,7 @@ Node origin은 Synology Container Manager의 Debian Bookworm 기반 Node.js 24 L
 - `.env`, `data/`, `logs/`는 container image와 분리해 백업합니다.
 - read-only filesystem, capability drop, `no-new-privileges`가 유지되는지 확인합니다.
 - Container Manager health와 restart 횟수를 감시합니다.
-- Cloudflare Tunnel connector 상태와 Access policy 변경을 함께 감시합니다.
+- Cloudflare Tunnel connector 상태와 published hostname·Cache Rule 변경을 함께 감시합니다.
 
 ## 요청 경로와 CDN 캐시
 
@@ -77,12 +77,10 @@ D1: trash_pending
 → D1: trashed, purge_after = trashed_at + 30일
 ```
 
-web Worker는 `origin-admin.example.com`으로 HTTPS 요청을 보내고 두 인증 계층을
-사용합니다.
+web Worker는 `origin-admin.example.com`으로 HTTPS 요청을 보내고 origin Bearer
+token으로 인증합니다.
 
 ```http
-CF-Access-Client-Id: <service token id>
-CF-Access-Client-Secret: <service token secret>
 Authorization: Bearer <origin mutation token>
 ```
 
@@ -124,7 +122,7 @@ origin 주기 작업은 휴지통 record의 만료 시각을 확인해 원본·t
 
 - Cloudflare Cache Analytics의 전체 HIT/MISS와 Tunnel/origin 요청 수
 - cache purge 실패 및 오래 지속되는 `trash_pending`
-- Access 인증 실패와 공개 이미지 hostname의 차단 요청
+- origin Bearer token 인증 실패와 공개 이미지 hostname의 차단 요청
 - origin 디스크 여유와 trash 크기
 - 30일이 지났지만 남은 `trashed` 항목
 - image URL 노출 기록 보존 작업과 D1 오류

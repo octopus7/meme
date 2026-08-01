@@ -39,7 +39,7 @@ img.example.com
   Cloudflare CDN → Tunnel → Synology origin
 
 origin-admin.example.com
-  Cloudflare Access Service Auth 필요
+  공개 관리 hostname, Bearer token 필요
   web Worker → Tunnel → Synology /internal/*
 ```
 
@@ -52,17 +52,14 @@ NAS 라우터에 포트 포워딩을 만들지 않습니다. Tunnel connector는
 - `GET`, `HEAD`의 `/i/*`, `/t/*`
 - 그 밖의 경로(`/internal/*`, `/healthz`)와 쓰기 메서드는 차단
 
-`origin-admin.example.com`은 Cloudflare Access 정책에서 서비스 토큰 인증만
-허용합니다. web Worker는 다음 두 인증 계층을 모두 보냅니다.
+`origin-admin.example.com`은 공개 published hostname입니다. 관리 API mutation은
+origin bearer token을 요구하고 web Worker만 이 token을 보냅니다.
 
 ```http
-CF-Access-Client-Id: <secret>
-CF-Access-Client-Secret: <secret>
 Authorization: Bearer <origin mutation token>
 ```
 
-Access가 우회되더라도 origin의 bearer token 검증이 통과해야 하며, 가능하면
-origin에서도 Host와 허용 경로를 검증합니다.
+origin에서는 bearer token을 검증하며, 가능하면 Host와 허용 경로도 검증합니다.
 
 ## 공개 이미지 CDN 캐시
 
@@ -114,7 +111,7 @@ DB  D1 database
 
 ## 도메인과 secret
 
-Custom Domain, Tunnel hostname, Access application/policy와 Cache Rule은
+Custom Domain, Tunnel hostname과 Cache Rule은
 대시보드에서 설정합니다. Wrangler 파일이나 소스에 실제 값은 넣지 않습니다.
 
 GitHub `web-production` 변수:
@@ -131,10 +128,8 @@ web Worker encrypted secrets:
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SESSION_SECRET`
 - `ORIGIN_ADMIN_TOKEN` (origin의 mutation token과 동일)
-- `CF_ACCESS_CLIENT_ID`
-- `CF_ACCESS_CLIENT_SECRET`
 - `CF_CACHE_PURGE_TOKEN` (대상 Zone의 Cache Purge 권한만)
 
 GitHub Actions의 `CLOUDFLARE_API_TOKEN`은 web Worker 배포 및 D1 migration
-Environment에서 각각 최소 권한으로 관리합니다. Access service token과 purge
-token은 GitHub 로그나 저장소에 노출하지 않습니다.
+Environment에서 각각 최소 권한으로 관리합니다. origin token과 purge token은
+GitHub 로그나 저장소에 노출하지 않습니다.

@@ -71,8 +71,8 @@ curl --fail http://127.0.0.1:8086/healthz
 
 라우터 port forwarding으로 8086이나 mutation API를 인터넷에 공개하지 않습니다.
 공개 이미지 hostname에는 `/i/*`, `/t/*`의 GET/HEAD만 연결하고 `/internal/*`와
-`/healthz`는 차단합니다. 관리 요청은 Access 보호 `origin-admin.example.com`을
-통해서만 도달해야 합니다.
+`/healthz`는 차단합니다. 관리 요청은 `origin-admin.example.com`으로 전달하되
+Bearer mutation token을 반드시 사용합니다.
 
 ## 업데이트와 rollback
 

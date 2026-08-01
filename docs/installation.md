@@ -20,12 +20,12 @@
 ```text
 app.example.com          Google 인증 웹 Worker
 img.example.com          공개 이미지 CDN → Tunnel → origin
-origin-admin.example.com Access 보호 관리 API → Tunnel → origin
+origin-admin.example.com Bearer token 관리 API → Tunnel → origin
 ```
 
 `img.example.com`은 URL을 아는 누구나 접근할 수 있으므로 주소 자체를 비밀로
 간주하면 안 됩니다. 업로드·삭제·복구 API는 `origin-admin.example.com`으로
-분리하고 Cloudflare Access Service Auth로 보호합니다.
+분리하고 origin Bearer token으로 보호합니다.
 
 ## 1. Linux origin 설치
 
@@ -49,8 +49,8 @@ curl --fail http://127.0.0.1:8086/healthz
 1. Cloudflare Tunnel을 만들고 Synology에 `cloudflared` connector를 설치합니다.
 2. `img.example.com` published route를 Node origin의 내부 `8086` 포트에 연결합니다.
 3. `origin-admin.example.com` published route도 같은 origin에 연결합니다.
-4. `origin-admin.example.com`을 Cloudflare Access application으로 등록하고
-   Service Auth 정책에서 web Worker의 `CF-Access-Client-Id`/secret만 허용합니다.
+4. `origin-admin.example.com` published route에는 별도 Access를 설정하지 않고,
+   origin mutation Bearer token으로 관리 요청을 인증합니다.
 5. `img.example.com`에는 `/i/*`, `/t/*`의 GET/HEAD만 허용하고
    `/internal/*`, `/healthz`, 모든 쓰기 메서드를 WAF 또는 hostname 규칙으로
    차단합니다.
@@ -109,8 +109,6 @@ Cloudflare web Worker encrypted secrets에는 다음을 등록합니다.
 GOOGLE_CLIENT_SECRET
 AUTH_SESSION_SECRET
 ORIGIN_ADMIN_TOKEN
-CF_ACCESS_CLIENT_ID
-CF_ACCESS_CLIENT_SECRET
 CF_CACHE_PURGE_TOKEN
 ```
 
@@ -124,7 +122,7 @@ GitHub Actions에서 다음 순서로 실행합니다.
 1. `Migrate D1`
 2. `Deploy web Worker`
 3. Cloudflare 대시보드에서 web Worker에 `app.example.com` Custom Domain 연결
-4. `img.example.com`과 `origin-admin.example.com` Tunnel route/Access/Cache Rule 확인
+4. `img.example.com`과 `origin-admin.example.com` Tunnel route/Cache Rule 확인
 
 storage Worker 배포 단계는 없습니다. 이미지 GET은 web Worker가 아니라 Cloudflare
 CDN에서 처리하며, web Worker는 목록·검색 HTML에 `IMAGE_ORIGIN` URL을 포함한 시각을
@@ -139,8 +137,8 @@ D1 노출 기록으로 남깁니다. 이 기록은 실제 다운로드나 HIT를
   시각·파일명·용량·화면·viewer sub가 남습니다.
 - `img.example.com/i/...`와 `/t/...`는 인증 없이 GET/HEAD가 동작하고, 두 번째
   요청에서 Cloudflare `Cf-Cache-Status`가 `HIT`인지 확인합니다.
-- `img.example.com/internal/*`와 `origin-admin.example.com`의 Access 없는 요청은
-  차단됩니다.
+- `img.example.com/internal/*`는 차단되고, `origin-admin.example.com`의 mutation
+  요청은 Bearer token 없이 401을 반환합니다.
 - 마지막 참조 삭제가 origin trash 이동과 cache-tag purge를 모두 완료한 뒤 새
   네트워크 요청에서 두 이미지 URL이 404가 됩니다(브라우저 로컬 캐시는 남을 수 있음).
 - `/admin`에서 이미지 URL 노출 기록 화면이 열리고, 일반 회원에게는 관리자 화면이

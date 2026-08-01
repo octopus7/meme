@@ -17,7 +17,6 @@ flowchart LR
         W["Google 인증 web Worker<br/>/search · /all · 업로드 · 삭제"]
         D[("D1<br/>이미지 메타데이터 · 접근 설정<br/>이미지 URL 노출 기록")]
         C["Cloudflare Edge/CDN<br/>img.example.com<br/>/i/{hash}.{ext} · /t/{hash}"]
-        A["Cloudflare Access<br/>origin-admin.example.com<br/>Service Token"]
         T["Cloudflare Tunnel"]
     end
 
@@ -32,8 +31,7 @@ flowchart LR
     U -->|"주소를 아는 누구나<br/>공개 이미지 GET/HEAD"| C
     W -.->|"목록·검색에 공개 URL 포함"| C
     C -->|"cache MISS"| T
-    W -->|"HTTPS + Access headers<br/>Bearer origin token"| A
-    A --> T
+    W -->|"HTTPS + Bearer origin token"| T
     T --> O
     O <--> F
     O -->|"마지막 참조 삭제"| X
@@ -46,8 +44,8 @@ D1의 회원 허용 설정으로 접근을 제어하며, 관리자 경로와 노
 아는 사용자의 공개 이미지 GET/HEAD는 `img.example.com`에서 처리합니다.
 
 `img.example.com`은 이미지 경로만 공개하고 Cache Rule로 정상 응답을 1년 캐시합니다.
-`origin-admin.example.com`은 Access Service Auth 정책으로 web Worker의 service
-token만 허용합니다. origin은 Access 헤더와 별도로 Bearer mutation token을 검증하며,
+`origin-admin.example.com`은 공개된 관리 hostname이지만 mutation 요청에는 origin의
+Bearer token이 필요합니다. web Worker만 이 token을 보유하고 관리 요청에 전송하며,
 두 호스트 모두 같은 Tunnel connector를 통해 내부 Node.js origin에 도달합니다.
 
 ## 이미지 조회와 엣지 캐시
@@ -92,7 +90,7 @@ sequenceDiagram
     participant C as Cloudflare Zone API
 
     U->>W: 이미지 + 설명 + 원래 파일명
-    W->>A: HTTPS + Access Service Token + Bearer token
+    W->>A: HTTPS + Bearer origin token
     A->>O: Tunnel로 스트리밍 업로드
     O->>O: 형식 검사, SHA-256, 썸네일 생성
     O-->>W: hash, 확장자, MIME, 크기
@@ -131,11 +129,11 @@ flowchart TB
 ```
 
 web Worker, D1 migration, origin build는 각각 독립된 workflow를 가지며 서로의 배포
-대상을 변경하지 않습니다. 공개 이미지 hostname, Tunnel, Access, Cache Rule은
-Cloudflare 대시보드에서 운영하며 별도 storage Worker나 Workers VPC 배포는 없습니다.
+대상을 변경하지 않습니다. 공개 이미지 hostname, Tunnel, Cache Rule은 Cloudflare
+대시보드에서 운영하며 별도 storage Worker나 Workers VPC 배포는 없습니다.
 origin workflow는 artifact만 만들며 서버를 변경하지 않습니다.
 
 Wrangler의 실제 설정은 Actions 실행 중 임시 생성 후 제거합니다. Cloudflare API
-토큰, origin 관리 토큰, Access service token과 cache purge token은 GitHub
-Environment secret에 두고, 계정·D1·호스트와 Worker 이름은 Environment variable에
-둡니다. 실제 값은 저장소와 배포 workflow에 커밋하지 않습니다.
+토큰, origin 관리 토큰과 cache purge token은 GitHub Environment secret에 두고,
+계정·D1·호스트와 Worker 이름은 Environment variable에 둡니다. 실제 값은 저장소와
+배포 workflow에 커밋하지 않습니다.

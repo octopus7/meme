@@ -13,13 +13,12 @@ VPC 구성을 찾아온 설치자는 [v1-vpc-final 릴리스](https://github.com
 - [ ] origin mutation token 생성 및 백업 정책 확인
 - [ ] 라우터 포트 포워딩이 없는지 확인
 
-## 2. Tunnel·Access·CDN
+## 2. Tunnel·CDN
 
 - [ ] Cloudflare Tunnel 생성 및 Synology에 `cloudflared` 설치
 - [ ] `img.example.com` → Node origin `8086` published route 생성
 - [ ] `origin-admin.example.com` → 같은 origin published route 생성
-- [ ] `origin-admin.example.com`에 Access application 생성
-- [ ] Access Service Auth 정책에서 web Worker service token만 허용
+- [ ] origin mutation Bearer token을 web Worker와 Synology에 동일하게 설정
 - [ ] `img.example.com`은 GET/HEAD `/i/*`, `/t/*`만 허용
 - [ ] `img.example.com/internal/*`, `/healthz`와 모든 쓰기 메서드 차단
 - [ ] `/i/*`, `/t/*` Cache Rule 생성(확장자 없는 `/t/{hash}` 포함)
@@ -56,8 +55,6 @@ Cloudflare web Worker encrypted secrets:
 - [ ] `GOOGLE_CLIENT_SECRET`
 - [ ] `AUTH_SESSION_SECRET`
 - [ ] `ORIGIN_ADMIN_TOKEN` (origin mutation token과 동일)
-- [ ] `CF_ACCESS_CLIENT_ID`
-- [ ] `CF_ACCESS_CLIENT_SECRET`
 - [ ] `CF_CACHE_PURGE_TOKEN`
 
 ### `d1-production`
@@ -80,14 +77,14 @@ Variables:
 - [ ] `Migrate D1` 실행(`image_url_exposure_logs` 포함)
 - [ ] `Deploy web Worker` 실행
 - [ ] web Worker에 `app.example.com` Custom Domain 연결
-- [ ] Tunnel route, Access 정책, Cache Rule이 배포 후에도 유지되는지 확인
+- [ ] Tunnel route와 Cache Rule이 배포 후에도 유지되는지 확인
 - [ ] 인증 없는 브라우저가 Google 인증 화면으로 이동하는지 확인
 - [ ] 관리자 계정으로 목록, 검색, 업로드가 동작하는지 확인
 - [ ] `/all`·`/search`의 이미지 URL이 `img.example.com`을 가리키는지 확인
 - [ ] 노출 기록에 시각·파일명·용량·화면·viewer sub가 남는지 확인
 - [ ] `img.example.com/i/...`와 `/t/...`가 인증 없이 GET/HEAD 동작하는지 확인
 - [ ] 두 번째 요청에서 `Cf-Cache-Status: HIT`인지 확인
-- [ ] `img.example.com/internal/*`와 Access 없는 `origin-admin` 요청이 차단되는지 확인
+- [ ] `img.example.com/internal/*`가 차단되고 `origin-admin` mutation token이 검증되는지 확인
 - [ ] 마지막 참조 삭제가 origin trash 이동 → cache-tag purge → D1 확정 순서인지 확인
 - [ ] purge 후 새 네트워크 요청에서 이미지 URL이 404인지 확인(브라우저 로컬 캐시는 남을 수 있음)
 - [ ] 관리자 `/exposures` 화면에서 기간 조회와 cursor pagination 확인
@@ -95,7 +92,7 @@ Variables:
 
 ## 5. 장애·운영 시험
 
-- [ ] Access token 누락·오류 시 관리 API가 거부되는지 확인
+- [ ] origin mutation token 누락·오류 시 관리 API가 거부되는지 확인
 - [ ] origin mutation token 불일치 시 업로드·삭제가 거부되는지 확인
 - [ ] Cloudflare purge 실패 시 `trash_pending`으로 남고 cron이 재시도하는지 확인
 - [ ] D1 장애 중에도 이미지 응답과 목록 응답이 실패하지 않는지 확인

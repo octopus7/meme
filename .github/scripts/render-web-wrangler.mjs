@@ -30,8 +30,6 @@ const config = {
       "GOOGLE_CLIENT_SECRET",
       "AUTH_SESSION_SECRET",
       "ORIGIN_ADMIN_TOKEN",
-      "CF_ACCESS_CLIENT_ID",
-      "CF_ACCESS_CLIENT_SECRET",
       "CF_CACHE_PURGE_TOKEN",
     ],
   },

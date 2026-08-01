@@ -17,7 +17,7 @@ Tunnel을 통해 원본 서버에 직접 연결되고, 성공 응답은 Cloudfla
 브라우저
 ├─ app.example.com  ─ Google 인증 ─ web Worker ─ D1
 ├─ img.example.com  ─ 공개 ─ Cloudflare edge cache ─ Tunnel ─ Node origin
-└─ origin-admin.example.com  ─ Access + service token ─ Tunnel ─ Node origin
+└─ origin-admin.example.com  ─ Bearer token ─ Tunnel ─ Node origin
 ```
 
 - 인증된 사용자의 `/`는 `/all`로 이동합니다. 비로그인 상태에서는 로그인 버튼을 표시합니다.
@@ -37,7 +37,7 @@ Tunnel을 통해 원본 서버에 직접 연결되고, 성공 응답은 Cloudfla
 
 1. [아키텍처와 요청 흐름](docs/architecture.md)
 2. [전체 설치 순서](docs/installation.md)
-3. [D1, Tunnel, Access와 Worker 설정](docs/cloudflare.md)
+3. [D1, Tunnel, CDN과 Worker 설정](docs/cloudflare.md)
 4. [Node.js origin 서비스 설치](docs/origin.md)
 5. [GitHub Actions 변수·비밀 및 격리 정책](docs/github-actions.md)
 6. [Google OAuth 설정](docs/google-oauth.md)

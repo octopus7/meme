@@ -1,6 +1,3 @@
-const ACCESS_CLIENT_ID_HEADER = "CF-Access-Client-Id";
-const ACCESS_CLIENT_SECRET_HEADER = "CF-Access-Client-Secret";
-
 function baseUrl(env: Env): string {
   const value = env.ORIGIN_ADMIN_BASE_URL.trim().replace(/\/+$/u, "");
   if (!/^https:\/\//u.test(value)) throw new Error("ORIGIN_ADMIN_BASE_URL must use HTTPS");
@@ -10,8 +7,6 @@ function baseUrl(env: Env): string {
 function adminHeaders(env: Env, headers?: HeadersInit): Headers {
   const result = new Headers(headers);
   result.set("Authorization", `Bearer ${env.ORIGIN_ADMIN_TOKEN}`);
-  result.set(ACCESS_CLIENT_ID_HEADER, env.CF_ACCESS_CLIENT_ID);
-  result.set(ACCESS_CLIENT_SECRET_HEADER, env.CF_ACCESS_CLIENT_SECRET);
   return result;
 }
 
