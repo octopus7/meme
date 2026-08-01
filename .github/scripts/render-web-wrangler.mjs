@@ -18,13 +18,22 @@ const config = {
   observability: { enabled: true },
   vars: {
     IMAGE_ORIGIN: required("IMAGE_ORIGIN"),
+    ORIGIN_ADMIN_BASE_URL: required("ORIGIN_ADMIN_BASE_URL"),
+    CF_ZONE_ID: required("CF_ZONE_ID"),
     GOOGLE_CLIENT_ID: required("GOOGLE_CLIENT_ID"),
     GOOGLE_REDIRECT_URI: required("GOOGLE_REDIRECT_URI"),
     GOOGLE_ALLOWED_EMAILS: required("GOOGLE_ALLOWED_EMAILS"),
     MAX_UPLOAD_BYTES: "20971520",
   },
   secrets: {
-    required: ["GOOGLE_CLIENT_SECRET", "AUTH_SESSION_SECRET"],
+    required: [
+      "GOOGLE_CLIENT_SECRET",
+      "AUTH_SESSION_SECRET",
+      "ORIGIN_ADMIN_TOKEN",
+      "CF_ACCESS_CLIENT_ID",
+      "CF_ACCESS_CLIENT_SECRET",
+      "CF_CACHE_PURGE_TOKEN",
+    ],
   },
   d1_databases: [
     {
@@ -32,13 +41,6 @@ const config = {
       database_name: required("D1_DATABASE_NAME"),
       database_id: required("D1_DATABASE_ID"),
       migrations_dir: "../../database/d1/migrations",
-    },
-  ],
-  services: [
-    {
-      binding: "STORAGE_ADMIN",
-      service: required("STORAGE_WORKER_NAME"),
-      entrypoint: "Admin",
     },
   ],
   triggers: {

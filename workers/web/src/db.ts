@@ -7,31 +7,22 @@ export interface ImageRow {
   description: string;
   blob_hash: string;
   extension: string;
+  original_filename: string;
+  byte_size: number;
   created_at: string;
 }
 
-export interface MediaRequestLogRow {
-  id: number;
-  requested_at: number;
-  blob_hash: string;
-  media_kind: "original" | "thumbnail";
-  request_method: "GET" | "HEAD";
-  cache_status: string;
-  response_status: number;
-  colo: string | null;
-  extension: string | null;
-  description: string | null;
-}
+export type ExposureContext = "all" | "search";
 
-export interface MediaFileStatsRow {
+export interface ImageUrlExposureRow {
+  id: number;
+  exposed_at: number;
+  image_item_id: string;
   blob_hash: string;
-  extension: string | null;
-  description: string | null;
-  total_requests: number;
-  cache_hits: number;
-  cache_misses: number;
-  cache_other: number;
-  response_errors: number;
+  original_filename: string;
+  byte_size: number;
+  exposure_context: ExposureContext;
+  viewer_sub: string;
 }
 
 export function searchTerms(query: string): string[] {
@@ -50,7 +41,8 @@ export async function search(env: Env, ownerSub: string, query: string, limit: n
   for (const term of terms) params.push(likePattern(term), likePattern(term));
   params.push(limit);
   const result = await env.DB.prepare(
-    `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
+    `SELECT i.id, i.description, i.blob_hash, b.extension,
+            i.original_filename, b.byte_size, i.created_at
      FROM image_items i JOIN blobs b ON b.hash = i.blob_hash
      WHERE b.state = 'active'
        AND i.owner_sub = ?
@@ -63,13 +55,15 @@ export async function search(env: Env, ownerSub: string, query: string, limit: n
 export async function list(env: Env, ownerSub: string, cursor: string | null, limit: number): Promise<ImageRow[]> {
   const decoded = cursor ? decodeCursor(cursor) : null;
   const sql = decoded
-    ? `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
+    ? `SELECT i.id, i.description, i.blob_hash, b.extension,
+              i.original_filename, b.byte_size, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
        WHERE b.state='active'
        AND i.owner_sub=?
        AND (i.created_at < ? OR (i.created_at = ? AND i.id < ?))
        ORDER BY i.created_at DESC, i.id DESC LIMIT ?`
-    : `SELECT i.id, i.description, i.blob_hash, b.extension, i.created_at
+    : `SELECT i.id, i.description, i.blob_hash, b.extension,
+              i.original_filename, b.byte_size, i.created_at
        FROM image_items i JOIN blobs b ON b.hash=i.blob_hash
        WHERE b.state='active'
        AND i.owner_sub=?
@@ -86,67 +80,63 @@ export function encodeCursor(row: ImageRow): string {
     .replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
 }
 
-export async function mediaRequestLogs(
+export async function writeImageUrlExposures(
+  env: Env,
+  rows: ImageRow[],
+  viewerSub: string,
+  exposureContext: ExposureContext,
+): Promise<void> {
+  const exposedAt = Math.floor(Date.now() / 1000);
+  const unique = new Map(rows.map((row) => [row.id, row]));
+  if (!unique.size) return;
+  await env.DB.batch([...unique.values()].map((row) => env.DB.prepare(
+    `INSERT INTO image_url_exposure_logs
+       (exposed_at, image_item_id, blob_hash, original_filename, byte_size, exposure_context, viewer_sub)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    exposedAt,
+    row.id,
+    row.blob_hash,
+    row.original_filename,
+    row.byte_size,
+    exposureContext,
+    viewerSub,
+  )));
+}
+
+export async function imageUrlExposures(
   env: Env,
   from: number,
   to: number,
   beforeAt: number | null,
   beforeId: number | null,
   limit: number,
-): Promise<MediaRequestLogRow[]> {
+): Promise<ImageUrlExposureRow[]> {
   const hasCursor = beforeAt !== null && beforeId !== null;
   const before = hasCursor
-    ? "AND (l.requested_at < ? OR (l.requested_at = ? AND l.id < ?))"
+    ? "AND (e.exposed_at < ? OR (e.exposed_at = ? AND e.id < ?))"
     : "";
   const values = hasCursor
     ? [from, to, beforeAt, beforeAt, beforeId, limit]
     : [from, to, limit];
   const result = await env.DB.prepare(
-    `SELECT l.id, l.requested_at, l.blob_hash, l.media_kind, l.request_method,
-            l.cache_status, l.response_status, l.colo, b.extension,
-            (SELECT i.description FROM image_items i
-             WHERE i.blob_hash=l.blob_hash
-             ORDER BY i.created_at, i.id LIMIT 1) AS description
-     FROM media_request_logs l
-     LEFT JOIN blobs b ON b.hash=l.blob_hash
-     WHERE l.requested_at >= ? AND l.requested_at < ? ${before}
-     ORDER BY l.requested_at DESC, l.id DESC
+    `SELECT e.id, e.exposed_at, e.image_item_id, e.blob_hash,
+            e.original_filename, e.byte_size, e.exposure_context, e.viewer_sub
+     FROM image_url_exposure_logs e
+     WHERE e.exposed_at >= ? AND e.exposed_at < ? ${before}
+     ORDER BY e.exposed_at DESC, e.id DESC
      LIMIT ?`,
-  ).bind(...values).all<MediaRequestLogRow>();
+  ).bind(...values).all<ImageUrlExposureRow>();
   return result.results;
 }
 
-export async function mediaFileStats(
-  env: Env,
-  from: number,
-  to: number,
-): Promise<MediaFileStatsRow[]> {
-  const result = await env.DB.prepare(
-    `SELECT l.blob_hash, b.extension,
-            (SELECT i.description FROM image_items i
-             WHERE i.blob_hash=l.blob_hash
-             ORDER BY i.created_at, i.id LIMIT 1) AS description,
-            COUNT(*) AS total_requests,
-            SUM(CASE WHEN l.cache_status='HIT' THEN 1 ELSE 0 END) AS cache_hits,
-            SUM(CASE WHEN l.cache_status='MISS' THEN 1 ELSE 0 END) AS cache_misses,
-            SUM(CASE WHEN l.cache_status NOT IN ('HIT', 'MISS') THEN 1 ELSE 0 END) AS cache_other,
-            SUM(CASE WHEN l.response_status >= 400 THEN 1 ELSE 0 END) AS response_errors
-     FROM media_request_logs l
-     LEFT JOIN blobs b ON b.hash=l.blob_hash
-     WHERE l.requested_at >= ? AND l.requested_at < ?
-     GROUP BY l.blob_hash, b.extension
-     ORDER BY total_requests DESC, l.blob_hash`,
-  ).bind(from, to).all<MediaFileStatsRow>();
-  return result.results;
-}
-
-export async function purgeExpiredMediaRequestLogs(env: Env): Promise<void> {
+export async function purgeExpiredImageUrlExposures(env: Env): Promise<void> {
   await env.DB.prepare(
-    `DELETE FROM media_request_logs
+    `DELETE FROM image_url_exposure_logs
      WHERE id IN (
-       SELECT id FROM media_request_logs
-       WHERE requested_at < unixepoch() - ?
-       ORDER BY requested_at
+       SELECT id FROM image_url_exposure_logs
+       WHERE exposed_at < unixepoch() - ?
+       ORDER BY exposed_at
        LIMIT 10000
      )`,
   ).bind(90 * 24 * 60 * 60).run();

@@ -51,13 +51,13 @@ async function route(request, response, context) {
   let match = ORIGINAL_PATH.exec(pathname);
   if (match && (request.method === "GET" || request.method === "HEAD")) {
     const media = await context.store.resolveOriginal(match[1], match[2]);
-    await serveMedia(request, response, media, MIME[match[2]], `"${match[1]}"`);
+    await serveMedia(request, response, media, MIME[match[2]], `"${match[1]}"`, match[1]);
     return;
   }
   match = THUMBNAIL_PATH.exec(pathname);
   if (match && (request.method === "GET" || request.method === "HEAD")) {
     const media = await context.store.resolveThumbnail(match[1]);
-    await serveMedia(request, response, media, "image/webp", `"${match[1]}-thumb"`);
+    await serveMedia(request, response, media, "image/webp", `"${match[1]}-thumb"`, match[1]);
     return;
   }
   if (request.method === "POST" && pathname === "/internal/v1/blobs") {
@@ -105,11 +105,13 @@ function authorize(request, expected) {
   }
 }
 
-async function serveMedia(request, response, media, contentType, etag) {
+async function serveMedia(request, response, media, contentType, etag, hash) {
   const modified = media.info.mtime.toUTCString();
   response.setHeader("Accept-Ranges", "bytes");
   response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  response.setHeader("Cache-Tag", `blob-${hash}`);
   response.setHeader("Content-Type", contentType);
+  response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   response.setHeader("ETag", etag);
   response.setHeader("Last-Modified", modified);
   if (notModified(request, etag, media.info.mtime)) {

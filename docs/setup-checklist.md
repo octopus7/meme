@@ -1,6 +1,8 @@
 # 운영 설정 체크리스트
 
-실제 ID, 도메인, 이메일과 토큰은 저장소에 기록하지 않습니다.
+실제 ID, 도메인, 이메일과 토큰은 저장소에 기록하지 않습니다. 이전 Reddit 글에서
+VPC 구성을 찾아온 설치자는 [v1-vpc-final 릴리스](https://github.com/octopus7/meme/releases/tag/v1-vpc-final)를
+참조하고, 아래 체크리스트는 현재 직접 Tunnel 구조에 적용합니다.
 
 ## 1. Origin 설치
 
@@ -8,30 +10,25 @@
 - [ ] `/volume1/docker/meme-origin`에 설치
 - [ ] Container Manager project와 health 상태 확인
 - [ ] 로컬 `/healthz` 성공 확인
-- [ ] 자동 생성된 origin mutation token 확인
+- [ ] origin mutation token 생성 및 백업 정책 확인
 - [ ] 라우터 포트 포워딩이 없는지 확인
 
-## 2. Cloudflare에서 생성·확인
+## 2. Tunnel·Access·CDN
 
-- [ ] Account ID 확인
-- [ ] D1 생성: 이름과 Database ID 기록
-- [ ] Cloudflare Tunnel 생성 및 NAS에 `cloudflared` 설치
-- [ ] Node용 HTTP VPC Service 생성: 내부 호스트, port `8086`
-- [ ] Node용 VPC Service ID 기록
-- [ ] web Worker 이름 결정
-- [ ] storage Worker 이름 결정
-- [ ] 같은 이름의 storage Worker를 대시보드에서 한 번 생성
-- [ ] web Custom Domain 결정: `https://<APP_DOMAIN>`
-- [ ] storage Custom Domain 결정: `https://<IMAGE_DOMAIN>`
-- [ ] storage Worker encrypted secret `ORIGIN_ADMIN_TOKEN` 등록
-- [ ] web 배포 API token 발급: Account `Workers Scripts: Edit`
-- [ ] storage 배포 API token 발급: Account `Workers Scripts: Edit`
-- [ ] storage token 발급 사용자에 `Connectivity Directory Bind` account member
-      role 부여
-- [ ] D1 migration API token 발급: Account `D1: Edit`
+- [ ] Cloudflare Tunnel 생성 및 Synology에 `cloudflared` 설치
+- [ ] `img.example.com` → Node origin `8086` published route 생성
+- [ ] `origin-admin.example.com` → 같은 origin published route 생성
+- [ ] `origin-admin.example.com`에 Access application 생성
+- [ ] Access Service Auth 정책에서 web Worker service token만 허용
+- [ ] `img.example.com`은 GET/HEAD `/i/*`, `/t/*`만 허용
+- [ ] `img.example.com/internal/*`, `/healthz`와 모든 쓰기 메서드 차단
+- [ ] `/i/*`, `/t/*` Cache Rule 생성(확장자 없는 `/t/{hash}` 포함)
+- [ ] 200/206 edge TTL 1년, 404/5xx 미캐시, query key 정책 확인
+- [ ] Zone cache purge API token 생성(태그 purge 최소 권한)
+- [ ] 이미지 origin 응답의 `Cache-Tag: blob-<sha256>` 확인
 
-세 API token은 각각 발급하고 대상 account/resource만 허용합니다. storage
-배포에 Admin role은 필요하지 않습니다.
+Workers VPC, VPC Service ID, `Connectivity Directory Bind`와 storage Worker는
+현재 구성에 필요하지 않습니다.
 
 ## 3. GitHub Environments
 
@@ -47,8 +44,9 @@ Variables:
 - [ ] `WEB_WORKER_NAME`
 - [ ] `D1_DATABASE_NAME`
 - [ ] `D1_DATABASE_ID`
-- [ ] `STORAGE_WORKER_NAME`
 - [ ] `IMAGE_ORIGIN=https://<IMAGE_DOMAIN>`
+- [ ] `ORIGIN_ADMIN_BASE_URL=https://<ORIGIN_ADMIN_DOMAIN>`
+- [ ] `CF_ZONE_ID`
 - [ ] `GOOGLE_CLIENT_ID`
 - [ ] `GOOGLE_REDIRECT_URI=https://<APP_DOMAIN>/auth/callback`
 - [ ] `GOOGLE_ALLOWED_EMAILS=<관리자 이메일 하나>`
@@ -57,23 +55,10 @@ Cloudflare web Worker encrypted secrets:
 
 - [ ] `GOOGLE_CLIENT_SECRET`
 - [ ] `AUTH_SESSION_SECRET`
-
-### `storage-production`
-
-Secrets:
-
-- [ ] `CLOUDFLARE_API_TOKEN`
-
-Variables:
-
-- [ ] `CF_ACCOUNT_ID`
-- [ ] `STORAGE_WORKER_NAME`
-- [ ] `D1_DATABASE_NAME`
-- [ ] `D1_DATABASE_ID`
-- [ ] `VPC_SERVICE_ID`: Node `8086` Service ID
-- [ ] `ORIGIN_BASE_URL`: Node origin의 내부 URL
-
-`VPC_SERVICE_ID`와 `ORIGIN_BASE_URL`은 같은 origin을 가리켜야 합니다.
+- [ ] `ORIGIN_ADMIN_TOKEN` (origin mutation token과 동일)
+- [ ] `CF_ACCESS_CLIENT_ID`
+- [ ] `CF_ACCESS_CLIENT_SECRET`
+- [ ] `CF_CACHE_PURGE_TOKEN`
 
 ### `d1-production`
 
@@ -87,16 +72,31 @@ Variables:
 - [ ] `D1_DATABASE_NAME`
 - [ ] `D1_DATABASE_ID`
 
-## 4. 배포 순서
+`storage-production`, `STORAGE_WORKER_NAME`, `VPC_SERVICE_ID`,
+`ORIGIN_BASE_URL`은 새 배포에 만들지 않습니다.
 
-- [ ] `ORIGIN_ADMIN_TOKEN`과 origin mutation token 일치 확인
-- [ ] `Migrate D1`
-- [ ] `Deploy storage Worker`
-- [ ] storage Custom Domain 연결
-- [ ] `Deploy web Worker`
-- [ ] web Custom Domain 연결
+## 4. 배포와 기능 점검
+
+- [ ] `Migrate D1` 실행(`image_url_exposure_logs` 포함)
+- [ ] `Deploy web Worker` 실행
+- [ ] web Worker에 `app.example.com` Custom Domain 연결
+- [ ] Tunnel route, Access 정책, Cache Rule이 배포 후에도 유지되는지 확인
 - [ ] 인증 없는 브라우저가 Google 인증 화면으로 이동하는지 확인
-- [ ] 관리자 계정으로 web 화면, 업로드, 검색, 캐시 HIT, 삭제 후 404 확인
-- [ ] 관리자 화면에서 외부 회원 ON/OFF와 즉시 차단 확인
-- [ ] 일반 회원에게 관리자 톱니가 없고 `/admin`, `/logs`가 404인지 확인
-- [ ] 관리자 통계에서 요청 목록, 구간 조회, 파일별 HIT율 확인
+- [ ] 관리자 계정으로 목록, 검색, 업로드가 동작하는지 확인
+- [ ] `/all`·`/search`의 이미지 URL이 `img.example.com`을 가리키는지 확인
+- [ ] 노출 기록에 시각·파일명·용량·화면·viewer sub가 남는지 확인
+- [ ] `img.example.com/i/...`와 `/t/...`가 인증 없이 GET/HEAD 동작하는지 확인
+- [ ] 두 번째 요청에서 `Cf-Cache-Status: HIT`인지 확인
+- [ ] `img.example.com/internal/*`와 Access 없는 `origin-admin` 요청이 차단되는지 확인
+- [ ] 마지막 참조 삭제가 origin trash 이동 → cache-tag purge → D1 확정 순서인지 확인
+- [ ] purge 후 새 네트워크 요청에서 이미지 URL이 404인지 확인(브라우저 로컬 캐시는 남을 수 있음)
+- [ ] 관리자 `/exposures` 화면에서 기간 조회와 cursor pagination 확인
+- [ ] 일반 회원에게 관리자 화면과 노출 기록이 노출되지 않는지 확인
+
+## 5. 장애·운영 시험
+
+- [ ] Access token 누락·오류 시 관리 API가 거부되는지 확인
+- [ ] origin mutation token 불일치 시 업로드·삭제가 거부되는지 확인
+- [ ] Cloudflare purge 실패 시 `trash_pending`으로 남고 cron이 재시도하는지 확인
+- [ ] D1 장애 중에도 이미지 응답과 목록 응답이 실패하지 않는지 확인
+- [ ] Tunnel 중단, 디스크 부족, 30일 purge를 별도 시험 데이터로 검증

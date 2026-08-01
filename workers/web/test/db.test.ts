@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { addItem, adoptLegacyItems, list, mediaRequestLogs, purgeExpiredMediaRequestLogs, search } from "../src/db";
+import {
+  addItem,
+  adoptLegacyItems,
+  imageUrlExposures,
+  list,
+  purgeExpiredImageUrlExposures,
+  search,
+  writeImageUrlExposures,
+} from "../src/db";
 
 describe("owned collection metadata", () => {
   it("updates only the current owner's row for a duplicate blob", async () => {
@@ -89,7 +97,7 @@ describe("owned collection metadata", () => {
   });
 });
 
-describe("media request log queries", () => {
+describe("image URL exposure log queries", () => {
   it("uses a stable timestamp and id cursor", async () => {
     let sql = "";
     let values: unknown[] = [];
@@ -110,15 +118,47 @@ describe("media request log queries", () => {
       return statement;
     };
 
-    await mediaRequestLogs(env, 100, 200, 150, 42, 101);
+    await imageUrlExposures(env, 100, 200, 150, 42, 101);
 
-    expect(sql).toContain("l.requested_at < ? OR (l.requested_at = ? AND l.id < ?)");
-    expect(sql).toContain("ORDER BY l.requested_at DESC, l.id DESC");
+    expect(sql).toContain("e.exposed_at < ? OR (e.exposed_at = ? AND e.id < ?)");
+    expect(sql).toContain("ORDER BY e.exposed_at DESC, e.id DESC");
     expect(values).toEqual([100, 200, 150, 150, 42, 101]);
     expect(sql).not.toContain("owner_sub");
   });
 
-  it("purges expired logs in bounded batches", async () => {
+  it("writes one row per image URL exposure", async () => {
+    const statements: Array<{ sql: string; values: unknown[] }> = [];
+    const db = Object.create(null) as D1Database;
+    db.prepare = (sql: string) => {
+      const statement = Object.create(null) as D1PreparedStatement;
+      statement.bind = (...values: unknown[]) => {
+        statements.push({ sql, values });
+        return statement;
+      };
+      return statement;
+    };
+    db.batch = async <T>(batch: D1PreparedStatement[]) => batch.map(() => Object.create(null) as D1Result<T>);
+    const env = Object.assign(Object.create(null), { DB: db }) as Env;
+    const row = {
+      id: "item-1",
+      description: "sample",
+      blob_hash: "a".repeat(64),
+      extension: "png",
+      original_filename: "sample.png",
+      byte_size: 42,
+      created_at: "2026-01-01T00:00:00Z",
+    };
+
+    await writeImageUrlExposures(env, [row, row], "viewer-sub", "search");
+
+    expect(statements).toHaveLength(1);
+    expect(statements[0]?.sql).toContain("image_url_exposure_logs");
+    expect(statements[0]?.values.slice(1)).toEqual([
+      "item-1", "a".repeat(64), "sample.png", 42, "search", "viewer-sub",
+    ]);
+  });
+
+  it("purges expired exposure logs in bounded batches", async () => {
     let sql = "";
     const statement = Object.create(null) as D1PreparedStatement;
     statement.bind = () => statement;
@@ -130,9 +170,9 @@ describe("media request log queries", () => {
       return statement;
     };
 
-    await purgeExpiredMediaRequestLogs(env);
+    await purgeExpiredImageUrlExposures(env);
 
-    expect(sql).toContain("requested_at < unixepoch() - ?");
+    expect(sql).toContain("exposed_at < unixepoch() - ?");
     expect(sql).toContain("LIMIT 10000");
   });
 });

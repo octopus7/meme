@@ -94,6 +94,9 @@ test("HTTP auth, ranges, conditional request, and trash 404", async (t) => {
   const mediaUrl = `${base}/i/${uploaded.hash}.png`;
   const media = await fetch(mediaUrl, { headers: { range: "bytes=0-9" } });
   assert.equal(media.status, 206);
+  assert.equal(media.headers.get("cache-control"), "public, max-age=31536000, immutable");
+  assert.equal(media.headers.get("cache-tag"), `blob-${uploaded.hash}`);
+  assert.equal(media.headers.get("cross-origin-resource-policy"), "cross-origin");
   assert.equal((await media.arrayBuffer()).byteLength, 10);
   const etag = media.headers.get("etag");
   assert.equal((await fetch(mediaUrl, { headers: { "if-none-match": etag } })).status, 304);

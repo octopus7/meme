@@ -34,8 +34,9 @@ The project provides:
 - application health check
 - read-only container filesystem, dropped capabilities, and private `/tmp`
 
-Cloudflare Tunnel on the NAS can reach `http://127.0.0.1:8086`. Do not expose
-the mutation API directly through a router port-forward.
+Cloudflare Tunnel on the NAS can reach `http://127.0.0.1:8086`. The public image
+hostname and the Access-protected admin hostname may target this local service,
+but do not expose the mutation API directly through a router port-forward.
 
 ### Install or update from a public GitHub archive without Git
 
@@ -62,13 +63,19 @@ sh /tmp/install-meme-origin.sh --repo octopus7/meme \
 
 ## API
 
-Public reads, normally reachable only through Tunnel/VPC:
+Public reads, reachable through the Cloudflare Tunnel image hostname:
 
 ```text
 GET|HEAD /i/{sha256}.{jpg|png|webp|gif}
 GET|HEAD /t/{sha256}
 GET      /healthz
 ```
+
+The `/internal/*` endpoints are for the Access-protected admin hostname only.
+Configure the public image hostname to allow only `GET`/`HEAD` for `/i/*` and
+`/t/*`; reject `/internal/*`, `/healthz`, and write methods there. The web Worker
+must send both the Cloudflare Access service token and the origin bearer token
+when calling the admin hostname.
 
 Media supports ETag, If-None-Match, If-Modified-Since, and one byte range.
 Mutations require `Authorization: Bearer <token>`:

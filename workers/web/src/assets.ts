@@ -6,11 +6,12 @@ export const ALL_JS = `(()=>{document.addEventListener("click",async e=>{const b
 
 export const DEPLOYMENT_JS = `(()=>{const e=document.getElementById("deployment-info");if(!e)return;fetch("/assets/deployment-info.json",{cache:"no-store",headers:{accept:"application/json"}}).then(r=>{if(!r.ok)throw new Error("deployment metadata unavailable");return r.json()}).then(v=>{if(typeof v.deployedAt!=="string"||typeof v.commitSha!=="string")throw new Error("invalid deployment metadata");const d=new Date(v.deployedAt);if(Number.isNaN(d.getTime()))throw new Error("invalid deployment time");const z=Intl.DateTimeFormat().resolvedOptions().timeZone||"local";const t=new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"medium"}).format(d);const s=v.commitSha.slice(0,7);e.textContent="배포: "+t+" ("+z+") · commit "+s;e.title="배포 시각(UTC): "+v.deployedAt+"\\ncommit: "+v.commitSha}).catch(()=>{e.textContent="배포 정보를 확인할 수 없습니다"})})();`;
 
-export const LOGS_JS = `(()=>{const pad=n=>String(n).padStart(2,"0"),localValue=s=>{const d=new Date(Number(s)*1000);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes())};document.querySelectorAll("time[data-epoch]").forEach(e=>{const d=new Date(Number(e.dataset.epoch)*1000);if(!Number.isNaN(d.getTime())){e.textContent=new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"medium"}).format(d);e.title=d.toISOString()}});const f=document.getElementById("log-filter");if(!f)return;const from=f.querySelector("#log-from"),to=f.querySelector("#log-to"),fromEpoch=f.querySelector("input[name=from]"),toEpoch=f.querySelector("input[name=to]");from.value=localValue(fromEpoch.value);to.value=localValue(toEpoch.value);f.addEventListener("submit",e=>{const a=new Date(from.value),b=new Date(to.value);if(Number.isNaN(a.getTime())||Number.isNaN(b.getTime())||a>=b){e.preventDefault();alert("올바른 조회 구간을 지정하세요.");return}fromEpoch.value=String(Math.floor(a.getTime()/1000));toEpoch.value=String(Math.floor(b.getTime()/1000))})})();`;
+export const EXPOSURES_JS = `(()=>{const pad=n=>String(n).padStart(2,"0"),localValue=s=>{const d=new Date(Number(s)*1000);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+"T"+pad(d.getHours())+":"+pad(d.getMinutes())};document.querySelectorAll("time[data-epoch]").forEach(e=>{const d=new Date(Number(e.dataset.epoch)*1000);if(!Number.isNaN(d.getTime())){e.textContent=new Intl.DateTimeFormat(undefined,{dateStyle:"medium",timeStyle:"medium"}).format(d);e.title=d.toISOString()}});const f=document.getElementById("log-filter");if(!f)return;const from=f.querySelector("#log-from"),to=f.querySelector("#log-to"),fromEpoch=f.querySelector("input[name=from]"),toEpoch=f.querySelector("input[name=to]");from.value=localValue(fromEpoch.value);to.value=localValue(toEpoch.value);f.addEventListener("submit",e=>{const a=new Date(from.value),b=new Date(to.value);if(Number.isNaN(a.getTime())||Number.isNaN(b.getTime())||a>=b){e.preventDefault();alert("올바른 조회 구간을 지정하세요.");return}fromEpoch.value=String(Math.floor(a.getTime()/1000));toEpoch.value=String(Math.floor(b.getTime()/1000))})})();`;
+
 
 export const ADMIN_CSS = `
-.logs-page{box-sizing:border-box;width:min(1400px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
-.logs-page h1{margin:.2rem 0 1rem;letter-spacing:-.04em}
+.exposures-page{box-sizing:border-box;width:min(1400px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
+.exposures-page h1{margin:.2rem 0 1rem;letter-spacing:-.04em}
 .log-filter{display:flex;align-items:end;flex-wrap:wrap;gap:.75rem;margin-bottom:.75rem;padding:1rem;border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07)}
 .log-filter label{display:grid;gap:.35rem;color:#4b5568;font-size:.82rem;font-weight:700}
 .log-filter input{min-height:2.4rem;padding:0 .6rem;border:1px solid #cfd6e3;border-radius:8px;color:#172033}
@@ -26,9 +27,6 @@ export const ADMIN_CSS = `
 .log-table tbody tr:last-child td{border-bottom:0}
 .log-description{max-width:24rem;overflow:hidden;text-overflow:ellipsis}
 .hash-link{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-.cache-badge{display:inline-flex;min-width:3.4rem;justify-content:center;padding:.2rem .45rem;border-radius:999px;background:#eef1f6;font-size:.75rem;font-weight:800}
-.cache-hit{background:#e9f8ef;color:#167246}.cache-miss{background:#fff4df;color:#9a5b00}.cache-bypass,.cache-unknown{background:#fff0f1;color:#a52b35}
-.hit-rate{font-variant-numeric:tabular-nums;font-weight:800}
 .admin-page{box-sizing:border-box;width:min(900px,100%);margin:0 auto;padding:clamp(1rem,4vw,2.5rem)}
 .admin-page h1{margin:.2rem 0 1rem;letter-spacing:-.04em}
 .admin-card{margin:0 0 1rem;padding:clamp(1rem,3vw,1.5rem);border:1px solid #dfe5ef;border-radius:14px;background:#fff;box-shadow:0 8px 28px rgba(33,48,82,.07)}
@@ -38,7 +36,7 @@ export const ADMIN_CSS = `
 .member-setting{display:flex;align-items:center;flex-wrap:wrap;gap:.8rem;margin-top:1rem;padding:1rem;border-radius:10px;background:#f8faff}
 .member-setting label{font-weight:700}
 .member-setting button{min-height:2.4rem;padding:0 .9rem;border:0;border-radius:8px;background:#3157c8;color:#fff;font-weight:750;cursor:pointer}
-@media(max-width:560px){.logs-page{padding:1rem}.log-filter label{width:100%}.log-filter input{box-sizing:border-box;width:100%}}
+@media(max-width:560px){.exposures-page{padding:1rem}.log-filter label{width:100%}.log-filter input{box-sizing:border-box;width:100%}}
 `;
 
 export const APP_CSS = `

@@ -10,7 +10,8 @@ DSM에 Node.js와 native 라이브러리를 직접 설치하는 방식보다 **C
 - x86-64 Synology/XPEnology와 Container Manager 또는 Docker Compose
 - `/volume1/docker/meme-origin`에 대한 읽기·쓰기 권한
 - 데이터와 로그를 위한 별도 백업
-- Cloudflare Tunnel이 `http://127.0.0.1:8086`에 접근할 수 있는 구성
+- Cloudflare Tunnel의 `img.example.com` 및 `origin-admin.example.com` route가
+  `http://127.0.0.1:8086`에 접근할 수 있는 구성
 
 지원 런타임은 Docker 이미지 안의 Node.js 24 LTS입니다. 빌드·테스트와 실행이
 DSM 자체 Node 버전에 의존하지 않습니다.
@@ -57,9 +58,10 @@ mkdir -p data logs
 - `PUID`와 `PGID`를 `data/`, `logs/` 소유 DSM 사용자 값으로 설정
 - `MEME_HOST_ROOT=/volume1/docker/meme-origin`
 
-같은 mutation token을 storage Worker의 Cloudflare encrypted secret
-`ORIGIN_ADMIN_TOKEN`에 등록합니다. 실제 `.env`, token, 이미지와 로그는 커밋하지
-않습니다.
+같은 mutation token을 web Worker의 Cloudflare encrypted secret
+`ORIGIN_ADMIN_TOKEN`에 등록합니다. `origin-admin.example.com`은 Cloudflare
+Access Service Auth 뒤에 두고, web Worker가 Access service token과 이 mutation
+token을 모두 보냅니다. 실제 `.env`, token, 이미지와 로그는 커밋하지 않습니다.
 
 Synology Container Manager에서:
 
@@ -81,6 +83,9 @@ Compose 구성은 다음 안전 경계를 적용합니다.
 - `restart: unless-stopped` 및 application health check
 
 라우터 port forwarding으로 8086이나 mutation API를 인터넷에 공개하지 않습니다.
+공개 이미지 hostname에는 `/i/*`, `/t/*`의 GET/HEAD만 연결하고
+`/internal/*`와 `/healthz`는 차단합니다. 관리 요청은 Access 보호
+`origin-admin.example.com`을 통해서만 도달해야 합니다.
 
 ## 업데이트
 

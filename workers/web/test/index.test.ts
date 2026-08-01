@@ -113,7 +113,7 @@ describe("authenticated web worker", () => {
 
     expect(response.status).toBe(200);
     expect(body).not.toContain(".admin-page");
-    expect(body).not.toContain(".logs-page");
+    expect(body).not.toContain(".exposures-page");
   });
 
   it("renders search without deployment tail and uses a list icon link", async () => {
@@ -210,12 +210,12 @@ describe("authenticated web worker", () => {
     const body = await all.text();
     expect(all.status).toBe(200);
     expect(body).not.toContain("/admin");
-    expect(body).not.toContain("/logs");
+    expect(body).not.toContain("/exposures");
     expect(body).not.toContain("관리자");
     expect(body).not.toContain("통계");
     expect(body).not.toContain("data-delete");
 
-    for (const path of ["/admin", "/logs", "/assets/logs.js", "/assets/admin.css"]) {
+    for (const path of ["/admin", "/exposures", "/assets/exposures.js", "/assets/admin.css"]) {
       const response = await worker.fetch(new Request(`https://meme.example${path}`, { headers }), env);
       expect(response.status).toBe(404);
       expect(await response.json()).toEqual({ error: "Not found" });
@@ -270,7 +270,7 @@ describe("authenticated web worker", () => {
     expect(await response.text()).toContain("Google로 로그인");
   });
 
-  it("renders the administrator page and statistics link only for the administrator", async () => {
+  it("renders the administrator page and exposure link only for the administrator", async () => {
     const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
     const session = await createSessionValue({
       sub: "admin-user-id",
@@ -287,7 +287,7 @@ describe("authenticated web worker", () => {
 
     expect(response.status).toBe(200);
     expect(body).toContain("owner@example.com");
-    expect(body).toContain('href="/logs"');
+    expect(body).toContain('href="/exposures"');
     expect(body).toContain('action="/admin/settings"');
     expect(body).toContain("/assets/admin.css");
     expect(body).not.toContain(" checked>");
@@ -495,7 +495,7 @@ describe("authenticated web worker", () => {
     expect(queries.some(({ sql }) => sql === "DELETE FROM image_items WHERE blob_hash=?")).toBe(false);
   });
 
-  it("renders log rows and statistics for the administrator", async () => {
+  it("renders image URL exposure rows for the administrator", async () => {
     const hash = "a".repeat(64);
     const db = Object.create(null) as D1Database;
     db.prepare = (sql: string) => {
@@ -503,29 +503,16 @@ describe("authenticated web worker", () => {
       statement.bind = () => statement;
       statement.all = async <T>() => ({
         success: true,
-        results: (sql.includes("GROUP BY")
-          ? [{
-              blob_hash: hash,
-              extension: "png",
-              description: "sample",
-              total_requests: 4,
-              cache_hits: 3,
-              cache_misses: 1,
-              cache_other: 0,
-              response_errors: 0
-            }]
-          : [{
-              id: 1,
-              requested_at: Math.floor(Date.now() / 1000) - 10,
-              blob_hash: hash,
-              media_kind: "original",
-              request_method: "GET",
-              cache_status: "HIT",
-              response_status: 200,
-              colo: "ICN",
-              extension: "png",
-              description: "sample"
-            }]) as T[],
+        results: [{
+          id: 1,
+          exposed_at: Math.floor(Date.now() / 1000) - 10,
+          image_item_id: "item-1",
+          blob_hash: hash,
+          original_filename: "sample.png",
+          byte_size: 1024,
+          exposure_context: "all",
+          viewer_sub: "admin-user-id"
+        }] as T[],
         meta: {
           duration: 0,
           size_after: 0,
@@ -545,7 +532,7 @@ describe("authenticated web worker", () => {
       exp: Math.floor(Date.now() / 1000) + 60
     }, authEnv.AUTH_SESSION_SECRET);
     const response = await worker.fetch(
-      new Request("https://meme.example/logs", {
+      new Request("https://meme.example/exposures", {
         headers: { cookie: `__Host-meme_session=${session}` }
       }),
       env
@@ -553,14 +540,14 @@ describe("authenticated web worker", () => {
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(body).toContain("파일별 캐시 통계");
-    expect(body).toContain("HIT율");
-    expect(body).toContain("75.0%");
-    expect(body).toContain("ICN");
-    expect(body).toContain("/assets/logs.js");
+    expect(body).toContain("이미지 URL 노출 기록");
+    expect(body).toContain("sample.png");
+    expect(body).toContain("1,024 bytes");
+    expect(body).toContain("admin-user-id");
+    expect(body).toContain("/assets/exposures.js");
   });
 
-  it("rejects log ranges longer than the 90 day retention window", async () => {
+  it("rejects exposure ranges longer than the 90 day retention window", async () => {
     const now = Math.floor(Date.now() / 1000);
     const env = Object.assign({}, authEnv, { DB: emptyDb("false") });
     const session = await createSessionValue({
@@ -569,7 +556,7 @@ describe("authenticated web worker", () => {
       exp: now + 60
     }, authEnv.AUTH_SESSION_SECRET);
     const response = await worker.fetch(
-      new Request(`https://meme.example/logs?from=${now - 91 * 86400}&to=${now}`, {
+      new Request(`https://meme.example/exposures?from=${now - 91 * 86400}&to=${now}`, {
         headers: { cookie: `__Host-meme_session=${session}` }
       }),
       env
@@ -578,7 +565,7 @@ describe("authenticated web worker", () => {
     expect(response.status).toBe(400);
   });
 
-  it("accepts a 90 day quick range after a short page delay", async () => {
+  it("accepts a 90 day exposure range after a short page delay", async () => {
     const now = Math.floor(Date.now() / 1000);
     const to = now - 30;
     const from = to - 90 * 86400;
@@ -589,7 +576,7 @@ describe("authenticated web worker", () => {
       exp: now + 60
     }, authEnv.AUTH_SESSION_SECRET);
     const response = await worker.fetch(
-      new Request(`https://meme.example/logs?from=${from}&to=${to}`, {
+      new Request(`https://meme.example/exposures?from=${from}&to=${to}`, {
         headers: { cookie: `__Host-meme_session=${session}` }
       }),
       env

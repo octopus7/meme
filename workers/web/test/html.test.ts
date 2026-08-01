@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LOGS_JS, SEARCH_JS, UPLOAD_JS } from "../src/assets";
+import { EXPOSURES_JS, SEARCH_JS, UPLOAD_JS } from "../src/assets";
 import { allLink, assetScript, assetStyle, escapeHtml, highlight, html, uploadForm } from "../src/html";
 import { searchTerms } from "../src/db";
 
@@ -69,9 +69,9 @@ describe("HTML helpers", () => {
     expect(SEARCH_JS).not.toContain("if(ime)return");
   });
 
-  it("formats log times in the browser timezone and submits epoch ranges", () => {
-    expect(() => new Function(LOGS_JS)).not.toThrow();
-    expect(LOGS_JS).toContain("Intl.DateTimeFormat");
-    expect(LOGS_JS).toContain("Math.floor(a.getTime()/1000)");
+  it("formats exposure times in the browser timezone and submits epoch ranges", () => {
+    expect(() => new Function(EXPOSURES_JS)).not.toThrow();
+    expect(EXPOSURES_JS).toContain("Intl.DateTimeFormat");
+    expect(EXPOSURES_JS).toContain("Math.floor(a.getTime()/1000)");
   });
 });
