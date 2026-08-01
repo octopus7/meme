@@ -45,7 +45,7 @@ export function createOriginServer({ config, store, accessLogger, logger = conso
 async function route(request, response, context) {
   const pathname = safePath(request.url);
   if (request.method === "GET" && pathname === "/healthz") {
-    json(response, 200, { status: "ok" });
+    json(response, 200, { status: "ok", commit: context.config.commitSha });
     return;
   }
   let match = ORIGINAL_PATH.exec(pathname);

@@ -43,21 +43,21 @@ but do not expose the mutation API directly through a router port-forward.
 Download the installer once, then point it at the repository:
 
 ```sh
-curl --fail --location --output /tmp/install-meme-origin.sh \
-  https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/install-from-github.sh
-sh /tmp/install-meme-origin.sh
+curl --fail --location --output /tmp/deploy-latest-from-github.sh \
+  https://raw.githubusercontent.com/octopus7/meme/main/origin/docker/deploy-latest-from-github.sh
+sh /tmp/deploy-latest-from-github.sh
 ```
 
-It extracts only `origin/` into `/volume1/docker/meme-origin`, creates a secure
-`.env` on first install, and preserves `.env`, `data/`, and `logs/` on updates.
-Previous application files are retained under `backups/`. After an update,
-use Container Manager’s **Build** and **Recreate** actions for the project.
-The script does not use Git, Wrangler, Workers, or D1.
+It extracts only `origin/` into `/volume1/docker/meme-origin`, resolves the
+`main` commit SHA, creates or updates the secure `.env`, builds and recreates the
+Container Manager project, and waits for `/healthz`. `.env`, `data/`, and `logs/`
+are preserved on updates, and previous application files are retained under
+`backups/`. The script does not use Git, Wrangler, Workers, or D1.
 
 For another volume path:
 
 ```sh
-sh /tmp/install-meme-origin.sh --repo octopus7/meme \
+sh /tmp/deploy-latest-from-github.sh --repo octopus7/meme \
   --target /volume1/docker/my-meme-origin
 ```
 
@@ -68,7 +68,7 @@ Public reads, reachable through the Cloudflare Tunnel image hostname:
 ```text
 GET|HEAD /i/{sha256}.{jpg|png|webp|gif}
 GET|HEAD /t/{sha256}
-GET      /healthz
+GET      /healthz  {"status":"ok","commit":"<sha>"}
 ```
 
 The `/internal/*` endpoints are for the Access-protected admin hostname only.

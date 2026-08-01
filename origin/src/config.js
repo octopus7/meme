@@ -29,12 +29,21 @@ function directory(name, fallback) {
   return path.resolve(value);
 }
 
+function commitSha() {
+  const value = (process.env.MEME_ORIGIN_COMMIT_SHA || "unknown").trim();
+  if (value !== "unknown" && !/^[0-9a-f]{7,40}$/.test(value)) {
+    throw new Error("MEME_ORIGIN_COMMIT_SHA must be a hexadecimal commit SHA or unknown");
+  }
+  return value;
+}
+
 export function loadConfig() {
   const token = process.env.MEME_ORIGIN_MUTATION_TOKEN || "";
   if (token.length < 32 || token.startsWith("replace-")) {
     throw new Error("MEME_ORIGIN_MUTATION_TOKEN must be a non-placeholder value of at least 32 characters");
   }
   return Object.freeze({
+    commitSha: commitSha(),
     host: (process.env.MEME_ORIGIN_HOST || "127.0.0.1").trim(),
     port: positiveInteger("MEME_ORIGIN_PORT", 8086),
     dataDir: directory("MEME_ORIGIN_DATA_DIR", "/var/lib/meme-origin"),

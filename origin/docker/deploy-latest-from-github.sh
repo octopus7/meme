@@ -20,7 +20,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-for command in curl docker mktemp rm; do
+commit_api_url="https://api.github.com/repos/${repository}/commits/${ref}"
+
+for command in curl docker grep mktemp rm sed; do
   command -v "$command" >/dev/null 2>&1 ||
     { echo "Missing command: $command" >&2; exit 1; }
 done
@@ -73,8 +75,27 @@ installer_url="https://raw.githubusercontent.com/${repository}/${ref}/origin/doc
 echo "Downloading the installer for ${repository}@${ref}..."
 curl --fail --location --retry 3 --output "$installer" "$installer_url"
 
+echo "Resolving commit SHA for ${repository}@${ref}..."
+commit_sha="$(curl --fail --silent --show-error --location --retry 3 \
+  -H 'Accept: application/vnd.github+json' \
+  -H 'X-GitHub-Api-Version: 2022-11-28' \
+  "$commit_api_url" \
+  | sed -n 's/^[[:space:]]*"sha"[[:space:]]*:[[:space:]]*"\([0-9a-f]\{40\}\)".*/\1/p' \
+  | sed -n '1p')"
+case "$commit_sha" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+  *) echo "Could not resolve a commit SHA from GitHub." >&2; exit 1 ;;
+esac
+echo "Deploying commit ${commit_sha}..."
+
 echo "Updating application files from ${repository}@${ref}..."
 sh "$installer" --repo "$repository" --ref "$ref" --target "$target"
+
+if grep -q '^MEME_ORIGIN_COMMIT_SHA=' "$target/.env"; then
+  sed -i "s/^MEME_ORIGIN_COMMIT_SHA=.*/MEME_ORIGIN_COMMIT_SHA=$commit_sha/" "$target/.env"
+else
+  printf '\nMEME_ORIGIN_COMMIT_SHA=%s\n' "$commit_sha" >> "$target/.env"
+fi
 
 cd "$target"
 
@@ -89,8 +110,8 @@ compose up -d --no-build
 echo "Waiting for ${health_url}..."
 attempt=1
 while [ "$attempt" -le 20 ]; do
-  if curl --fail --silent --show-error "$health_url" >/dev/null; then
-    echo "Deployment completed successfully."
+  if health_response="$(curl --fail --silent --show-error "$health_url")"; then
+    echo "Deployment completed successfully: ${health_response}"
     compose ps
     exit 0
   fi

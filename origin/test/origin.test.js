@@ -17,6 +17,7 @@ async function fixture() {
   const config = {
     host: "127.0.0.1",
     port: 0,
+    commitSha: "test-commit",
     dataDir: path.join(root, "data"),
     accessLogDir: path.join(root, "logs"),
     mutationToken: TOKEN,
@@ -80,7 +81,9 @@ test("HTTP auth, ranges, conditional request, and trash 404", async (t) => {
     await f.close();
   });
   const content = await png();
-  assert.equal((await fetch(`${base}/healthz`)).status, 200);
+  const health = await fetch(`${base}/healthz`);
+  assert.equal(health.status, 200);
+  assert.deepEqual(await health.json(), { status: "ok", commit: "test-commit" });
   assert.equal((await fetch(`${base}/internal/v1/blobs`, { method: "POST", body: content })).status, 401);
   const uploadedResponse = await fetch(`${base}/internal/v1/blobs?secret=not-logged`, {
     method: "POST",
