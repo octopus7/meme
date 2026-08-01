@@ -57,6 +57,7 @@ describe("HTML helpers", () => {
     expect(UPLOAD_JS).toContain("POST /api/images 전송 시작");
     expect(UPLOAD_JS).toContain("r.status");
     expect(UPLOAD_JS).toContain("await r.text()");
+    expect(UPLOAD_JS).toContain("window.location.reload()");
     expect(UPLOAD_JS).toContain('log("ERROR"');
     expect(UPLOAD_JS).toContain('log("DONE"');
   });
