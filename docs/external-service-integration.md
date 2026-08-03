@@ -1,106 +1,105 @@
-# Worker+D1 서비스에서 meme 이미지 저장소 사용하기
+# Using the `meme` Image Store from a Worker+D1 Service
+[한국어](external-service-integration.KO.md) | **English**
 
-이 문서는 새 서비스를 구현하는 에이전트에게 단독으로 전달하는 연동 명세입니다.
-새 서비스는 Cloudflare Pages와 Worker를 분리하고, Worker에는 새 서비스 전용 D1을
-연결합니다. `meme`는 이미지 파일 업로드와 공개 URL 서빙만 담당합니다.
+This document is an integration specification intended to be handed to an agent implementing a new service on its own.
+The new service separates Cloudflare Pages and a Worker, and connects a D1 dedicated to the new service to the Worker.
+`meme` handles only image-file uploads and public URL serving.
 
-## 확정된 역할
+## Confirmed Responsibilities
 
-### 새 서비스
+### New service
 
-- Cloudflare Pages: 정적 HTML, CSS, JavaScript 제공
-- Cloudflare Worker: 애플리케이션 API와 `meme` 업로드 호출
-- 새 서비스 D1: 이미지 설명, 소유 관계, 게시물 관계, 검색용 데이터와 `meme`가
-  반환한 이미지 주소 저장
-- 사용자 로그인과 권한 처리: 필요한 경우 새 서비스가 자체적으로 처리
+- Cloudflare Pages: provides static HTML, CSS, and JavaScript
+- Cloudflare Worker: provides the application API and calls the `meme` upload endpoint
+- New service D1: stores image descriptions, ownership relationships, post relationships, search data, and the image addresses returned by `meme`
+- User login and authorization: handled by the new service itself when needed
 
 ### meme
 
-- 유효한 업로드 token을 가진 서버의 이미지 업로드 허용
-- 업로드 결과로 원본과 미리보기의 공개 URL 반환
-- 반환한 URL에서 이미지 `GET`/`HEAD` 제공
-- Cloudflare CDN cache MISS일 때 Tunnel을 거쳐 origin에서 이미지 제공
+- Allows image uploads from servers holding a valid upload token
+- Returns public URLs for the original and preview as the upload result
+- Serves images via `GET`/`HEAD` at the returned URLs
+- When the Cloudflare CDN has a cache MISS, serves the image from the origin through the Tunnel
 
-### meme가 제공하지 않는 기능
+### Features not provided by `meme`
 
-- 사용자 로그인 또는 사용자 계정 연결
-- 이미지 목록
-- 이미지 검색
-- 게시물이나 애플리케이션 메타데이터 관리
-- 새 서비스 D1과의 직접 연결
-- 이 연동 명세에서의 이미지 삭제 API
+- User login or user-account linking
+- Image listing
+- Image search
+- Post or application-metadata management
+- Direct connection to the new service's D1
+- An image-deletion API in this integration specification
 
-이미지를 올린 주체가 자신의 D1에 주소와 메타데이터를 저장하고 직접 목록과 검색을
-구현합니다. `meme`에 목록 또는 검색 endpoint를 추가하지 않습니다.
+The party that uploads an image stores its address and metadata in its own D1 and implements listing and search directly.
+Do not add a listing or search endpoint to `meme`.
 
-## 전체 구조
+## Overall Architecture
 
 ```text
-브라우저
-├─ 정적 화면 ───────────────→ Cloudflare Pages
-├─ 앱 API/업로드 ───────────→ 새 서비스 Worker ─→ 새 서비스 D1
-│                                  │
-│                                  └─ 업로드 token ─→ meme upload endpoint
-└─ 공개 이미지 GET/HEAD ───→ meme 이미지 도메인 ─→ Cloudflare CDN
-                                                        │ cache MISS
-                                                        ▼
-                                                  Tunnel → origin
+Browser
+├─ Static screens ─────────────→ Cloudflare Pages
+├─ App API/upload ─────────────→ New service Worker ─→ New service D1
+│                                    │
+│                                    └─ Upload token ─→ meme upload endpoint
+└─ Public image GET/HEAD ─────→ meme image domain ─→ Cloudflare CDN
+                                                          │ cache MISS
+                                                          ▼
+                                                    Tunnel → origin
 ```
 
-Pages는 `meme`를 직접 호출하지 않습니다. 새 서비스 Worker가 업로드 token을 붙여
-서버 간 요청을 보내고, 브라우저에는 업로드 결과로 받은 공개 이미지 URL만 전달합니다.
+Pages does not call `meme` directly. The new service Worker attaches the upload token and
+sends a server-to-server request, then passes only the public image URL received as the upload result to the browser.
 
-## 인증 원칙
+## Authentication Principles
 
-이미지 업로드 자격은 사용자 로그인과 관계없이 `meme` 업로드 token으로만 판단합니다.
+Image-upload authorization is determined only by the `meme` upload token, independently of user login.
 
-- 새 서비스 로그인 token, Google OAuth, session cookie를 `meme`에 보내지 않습니다.
-- `meme` 업로드 token은 새 서비스 Worker 하나의 자격 증명입니다.
-- 사용자가 새 서비스에 로그인했는지는 `meme`가 알 필요가 없습니다.
-- 새 서비스에서 누가 업로드 기능을 사용할 수 있는지는 새 서비스 Worker가 자체적으로
-  결정합니다.
-- 이미지 조회에는 로그인과 token이 모두 필요하지 않습니다.
+- Do not send the new service login token, Google OAuth, or session cookie to `meme`.
+- The `meme` upload token is a credential for the single new service Worker.
+- `meme` does not need to know whether the user is logged in to the new service.
+- The new service Worker independently decides who may use the upload feature in the new service.
+- Image retrieval requires neither login nor a token.
 
-새 서비스 Worker는 `meme` 업로드 요청에 다음 헤더를 보냅니다.
+The new service Worker sends the following header on `meme` upload requests.
 
 ```http
 Authorization: Bearer <meme upload token>
 ```
 
-token은 최소 32바이트의 암호학적으로 안전한 무작위 값을 사용합니다. 새 서비스
-Worker의 encrypted secret에 `MEME_UPLOAD_TOKEN`으로 등록하고 Pages 환경 변수,
-정적 JavaScript, D1, Git 저장소와 로그에는 넣지 않습니다.
+Use a cryptographically secure random value of at least 32 bytes for the token. Register it as
+`MEME_UPLOAD_TOKEN` in the new service Worker's encrypted secret, and do not put it in Pages environment variables,
+static JavaScript, D1, the Git repository, or logs.
 
-기존 `meme`의 Google session secret, `ORIGIN_ADMIN_TOKEN`, cache purge token 또는
-Tunnel token을 업로드 token으로 재사용하거나 새 서비스에 공유하면 안 됩니다.
-`meme`에는 이 서비스만을 위한 **업로드 전용 token**을 별도로 만들어야 합니다.
+Do not reuse or share the existing `meme` Google session secret, `ORIGIN_ADMIN_TOKEN`, cache purge token, or
+Tunnel token as the upload token with the new service. `meme` must have a separate **upload-only token** made
+specifically for this service.
 
-## 선행 구현 사항
+## Prerequisite Implementation
 
-현재 `meme`의 브라우저 업로드 API는 Google session과 same-origin 요청을 전제로
-합니다. origin의 기존 `/internal/v1/blobs`는 삭제·복구에도 사용되는 관리 token으로
-보호됩니다. 둘 다 새 서비스가 직접 사용하면 안 됩니다.
+The current `meme` browser upload API assumes a Google session and same-origin requests. The existing
+`/internal/v1/blobs` on the origin is protected by an admin token and is also used for deletion and restoration.
+The new service must not use either directly.
 
-따라서 `meme`에 다음 성격의 연동 endpoint를 먼저 추가합니다.
+Therefore, first add an integration endpoint to `meme` with the following characteristics.
 
 ```text
 POST https://<MEME_UPLOAD_HOST>/v1/images
 ```
 
-이 endpoint는 다음 조건을 만족해야 합니다.
+This endpoint must satisfy the following conditions.
 
-- `MEME_UPLOAD_TOKEN`에 대응하는 별도 token만 허용
-- 업로드 이외의 origin 관리 작업 권한은 부여하지 않음
-- request body를 origin 저장 로직으로 스트리밍
-- 성공 시 완성된 공개 이미지 URL을 JSON으로 반환
-- 목록, 검색, 사용자 조회와 삭제 endpoint는 만들지 않음
+- Allow only a separate token corresponding to `MEME_UPLOAD_TOKEN`
+- Grant no origin-administration permissions beyond uploading
+- Stream the request body through the origin storage logic
+- Return the completed public image URL as JSON on success
+- Do not create listing, search, user-lookup, or deletion endpoints
 
-이 경로는 목표 계약입니다. 실제 배포에서 endpoint와 전용 token 검증이 구현되어
-호출 시험을 통과하기 전까지 연동 완료로 판단하지 않습니다.
+This path is the target contract. Do not consider the integration complete until the endpoint and dedicated-token
+validation are implemented in the actual deployment and pass an invocation test.
 
-## 업로드 API 계약
+## Upload API Contract
 
-요청 body는 multipart가 아닌 원본 이미지 bytes입니다.
+The request body is raw image bytes, not multipart.
 
 ```http
 POST /v1/images HTTP/1.1
@@ -113,21 +112,20 @@ X-Original-Filename: example.png
 <raw image bytes>
 ```
 
-`X-Original-Filename`에 ASCII 이외의 문자가 있으면 `encodeURIComponent`한 값을
-전송하고 `meme`에서 한 번만 decode합니다. 이미지 설명, 태그와 게시물 정보는
-`meme`에 보내지 않고 새 서비스 D1에 저장합니다.
+If `X-Original-Filename` contains non-ASCII characters, send its `encodeURIComponent` value and decode it exactly
+once in `meme`. Do not send image descriptions, tags, or post information to `meme`; store them in the new service D1.
 
-`meme` upload endpoint는 다음을 검증합니다.
+The `meme` upload endpoint validates the following.
 
 - `Authorization: Bearer` token
-- `Content-Length` 존재 여부와 최대 업로드 byte 수
-- JPEG, PNG, WebP, GIF 실제 파일 형식
-- 최대 pixel 수
-- 원래 파일명 길이
-- token 단위 rate limit과 업로드 동시성
-- 같은 token과 `Idempotency-Key` 조합의 중복 요청
+- Whether `Content-Length` exists and the maximum upload byte count
+- The actual file format: JPEG, PNG, WebP, or GIF
+- Maximum pixel count
+- Original filename length
+- Per-token rate limiting and upload concurrency
+- Duplicate requests for the same token and `Idempotency-Key` combination
 
-권장 성공 응답:
+Recommended success response:
 
 ```http
 HTTP/1.1 201 Created
@@ -146,59 +144,56 @@ Cache-Control: private, no-store
 }
 ```
 
-새 서비스는 `original_url`과 `thumbnail_url`을 직접 조립하지 않고 응답값을 그대로
-저장합니다.
+The new service must store the response values as-is rather than constructing `original_url` and `thumbnail_url` directly.
 
-권장 오류 응답:
+Recommended error responses:
 
-| 상태 | 의미 | 새 서비스 처리 |
+| Status | Meaning | New service handling |
 |---|---|---|
-| `400` | 이미지 형식 또는 요청 메타데이터 오류 | 사용자에게 오류 표시, 재시도 안 함 |
-| `401` | token 없음 또는 불일치 | 운영 오류로 기록, token 확인 |
-| `413` | 허용 크기 초과 | 사용자에게 크기 제한 표시 |
-| `429` | rate limit 초과 | `Retry-After`를 존중해 제한 재시도 |
-| `5xx` | 일시적인 저장소·Tunnel 장애 | 지수 backoff로 제한 재시도 |
+| `400` | Image format or request-metadata error | Show the error to the user; do not retry |
+| `401` | Token missing or does not match | Record as an operational error; verify the token |
+| `413` | Allowed size exceeded | Show the size limit to the user |
+| `429` | Rate limit exceeded | Respect `Retry-After` and retry within the limit |
+| `5xx` | Temporary storage or Tunnel failure | Retry with bounded exponential backoff |
 
-오류 JSON은 세부 내부 경로, token 또는 origin 관리 정보를 포함하지 않습니다.
+Error JSON must not include detailed internal paths, tokens, or origin-administration information.
 
-## 새 서비스 Worker 구현
+## New Service Worker Implementation
 
-Pages에서 받은 이미지 body를 전체 buffering하지 말고 가능한 한 `meme`로
-스트리밍합니다.
+Stream the image body received by Pages to `meme` as much as possible instead of buffering it in full.
 
-새 서비스 Worker 환경 설정:
+New service Worker environment settings:
 
 ```text
-MEME_UPLOAD_BASE_URL=https://<MEME_UPLOAD_HOST>   일반 설정
-MEME_IMAGE_ORIGIN=https://<MEME_IMAGE_HOST>      일반 설정
+MEME_UPLOAD_BASE_URL=https://<MEME_UPLOAD_HOST>   general setting
+MEME_IMAGE_ORIGIN=https://<MEME_IMAGE_HOST>      general setting
 MEME_UPLOAD_TOKEN=<secret>                       encrypted secret
 ```
 
-처리 순서:
+Processing order:
 
 ```text
-Pages의 업로드 요청
-→ 새 서비스 Worker의 자체 요청 검증
-→ 고유 Idempotency-Key 생성
-→ meme upload endpoint로 body 스트리밍
-→ meme 응답의 URL과 hash 검증
-→ 새 서비스 D1에 애플리케이션 데이터와 URL 저장
-→ Pages에 필요한 결과만 반환
+Pages upload request
+→ New service Worker's own request validation
+→ Generate a unique Idempotency-Key
+→ Stream the body to the meme upload endpoint
+→ Validate the URLs and hash in the meme response
+→ Store application data and URLs in the new service D1
+→ Return only the result needed by Pages
 ```
 
-새 서비스 Worker는 `meme` 응답을 신뢰하기 전에 다음을 확인합니다.
+Before trusting the `meme` response, the new service Worker verifies the following.
 
-- `hash`가 64자리 소문자 hexadecimal인지
-- `extension`이 허용 목록에 있는지
-- 두 URL이 HTTPS이며 운영자가 설정한 정확한 이미지 hostname인지
-- 원본 경로가 `/i/<hash>.<extension>`인지
-- 미리보기 경로가 `/t/<hash>`인지
-- URL에 query와 fragment가 없는지
+- `hash` is a 64-character lowercase hexadecimal string
+- `extension` is in the allowed list
+- Both URLs use HTTPS and the exact image hostname configured by the operator
+- The original path is `/i/<hash>.<extension>`
+- The preview path is `/t/<hash>`
+- The URLs have no query or fragment
 
-## 새 서비스 D1 저장
+## New Service D1 Storage
 
-이미지 파일 bytes는 D1에 저장하지 않습니다. 애플리케이션 테이블에는 필요한
-관계 데이터와 함께 최소한 다음 값을 저장합니다.
+Do not store image-file bytes in D1. In application tables, store at least the following values along with the required relationship data.
 
 ```text
 meme_hash
@@ -209,36 +204,31 @@ meme_byte_size
 created_at
 ```
 
-파일명, 설명, 태그, 업로더와 게시물 관계는 전부 새 서비스의 데이터입니다. 목록과
-검색도 이 D1만 사용해 구현합니다. `meme` D1을 바인딩하거나 조회하지 않습니다.
+The filename, description, tags, uploader, and post relationships all belong to the new service's data.
+Implement listing and search using only this D1. Do not bind or query the `meme` D1.
 
-업로드는 `meme` 파일 저장과 새 서비스 D1 쓰기로 나뉘므로 하나의 transaction이
-아닙니다.
+The upload is split between `meme` file storage and the new service D1 write, so it is not one transaction.
 
-1. `meme` 업로드가 실패하면 새 서비스 D1 레코드를 확정하지 않습니다.
-2. `meme` 업로드가 성공했지만 D1 쓰기가 실패하면 같은 `Idempotency-Key`로 재시도해
-   같은 업로드 결과를 받습니다.
-3. 요청 id와 hash는 구조화된 로그에 남길 수 있지만 token과 이미지 body는 남기지
-   않습니다.
+1. If the `meme` upload fails, do not commit the new service D1 record.
+2. If the `meme` upload succeeds but the D1 write fails, retry with the same `Idempotency-Key` to receive the same upload result.
+3. The request ID and hash may be kept in structured logs, but do not log the token or image body.
 
-## 공개 이미지 서빙
+## Public Image Serving
 
-공개 이미지 URL 형식:
+Public image URL formats:
 
-| 종류 | URL |
+| Type | URL |
 |---|---|
-| 원본 | `https://<MEME_IMAGE_HOST>/i/<sha256>.<ext>` |
-| 128×128 WebP 미리보기 | `https://<MEME_IMAGE_HOST>/t/<sha256>` |
+| Original | `https://<MEME_IMAGE_HOST>/i/<sha256>.<ext>` |
+| 128×128 WebP preview | `https://<MEME_IMAGE_HOST>/t/<sha256>` |
 
-조회는 `GET`과 `HEAD`만 허용하고 인증은 요구하지 않습니다. URL을 획득한 사람은
-누구나 이미지를 볼 수 있습니다. URL을 비밀 링크나 접근 제어 수단으로 간주하면
-안 되며 민감한 이미지를 저장하지 않습니다.
+Allow only `GET` and `HEAD` for retrieval, and do not require authentication. Anyone who obtains a URL can view
+the image. Do not treat URLs as secret links or access-control mechanisms, and do not store sensitive images.
 
-브라우저는 새 서비스 Worker를 거치지 않고 반환받은 이미지 URL을 직접 `<img>`에
-사용합니다. Cloudflare CDN cache HIT이면 Tunnel과 origin까지 요청이 전달되지
-않습니다.
+The browser uses the returned image URL directly in `<img>` without going through the new service Worker. When the
+Cloudflare CDN has a cache HIT, the request does not reach the Tunnel or origin.
 
-성공 이미지 응답은 장기간 immutable하게 캐시될 수 있습니다.
+Successful image responses may be cached as immutable for a long period.
 
 ```http
 Cache-Control: public, max-age=31536000, immutable
@@ -246,79 +236,73 @@ Cache-Tag: blob-<sha256>
 Cross-Origin-Resource-Policy: cross-origin
 ```
 
-일반적인 `<img src="...">` 표시는 CORS 없이 가능합니다. 브라우저 JavaScript가
-이미지 body나 canvas 픽셀을 읽는 기능은 이 명세의 범위가 아니며 별도 CORS를
-요구할 수 있습니다.
+Ordinary `<img src="...">` display works without CORS. Having browser JavaScript read the image body or canvas
+pixels is outside the scope of this specification and may require separate CORS.
 
-## Pages와 Worker 분리
+## Separating Pages and the Worker
 
-Pages와 새 서비스 Worker가 서로 다른 origin이면 새 서비스 Worker가 정확한 Pages
-origin에 대해서만 CORS를 허용합니다. `meme` upload endpoint를 브라우저용 CORS로
-열지 않습니다.
+If Pages and the new service Worker have different origins, the new service Worker allows CORS only for the exact
+Pages origin. Do not open the `meme` upload endpoint to browser CORS.
 
-- Pages는 새 서비스 Worker만 호출합니다.
-- 새 서비스 Worker만 `MEME_UPLOAD_TOKEN`을 보유합니다.
-- 허용하는 Pages origin, method와 request header를 최소화합니다.
-- 필요한 `OPTIONS` preflight를 새 서비스 Worker에서 처리합니다.
-- `MEME_UPLOAD_TOKEN`을 Pages 번들, 응답, 오류 body 또는 브라우저 요청에 넣지
-  않습니다.
+- Pages calls only the new service Worker.
+- Only the new service Worker holds `MEME_UPLOAD_TOKEN`.
+- Minimize the allowed Pages origins, methods, and request headers.
+- Handle the required `OPTIONS` preflight in the new service Worker.
+- Do not put `MEME_UPLOAD_TOKEN` in the Pages bundle, responses, error bodies, or browser requests.
 
-## 보관 정책
+## Retention Policy
 
-이 연동은 업로드와 공개 서빙만 제공합니다. 삭제 API가 없으므로 업로드된 파일은
-운영자의 별도 보관 정책이 적용될 때까지 남습니다. 나중에 삭제가 필요해지면 업로드
-token과 분리된 권한 및 별도 계약으로 설계하며, 현재 문서에 임의로 삭제 호출을
-추가하지 않습니다.
+This integration provides only uploading and public serving. Because there is no deletion API, uploaded files
+remain until the operator's separate retention policy applies. If deletion becomes necessary later, design it with
+permissions separate from the upload token and a separate contract; do not add arbitrary deletion calls to this document.
 
-## 금지 사항
+## Prohibited Actions
 
-- Google session cookie로 기존 브라우저 API를 자동화하지 않습니다.
-- 기존 `ORIGIN_ADMIN_TOKEN`을 새 서비스에 공유하지 않습니다.
-- origin의 `/internal/*` 관리 API를 직접 호출하지 않습니다.
-- `/all`이나 `/api/search`를 scraping하지 않습니다.
-- 새 서비스 Worker에서 `meme` D1을 직접 읽지 않습니다.
-- Pages나 브라우저에 업로드 token을 전달하지 않습니다.
-- 공개 이미지 URL을 인증 또는 권한 확인 수단으로 사용하지 않습니다.
+- Do not automate the existing browser API with a Google session cookie.
+- Do not share the existing `ORIGIN_ADMIN_TOKEN` with the new service.
+- Do not call the origin's `/internal/*` administration API directly.
+- Do not scrape `/all` or `/api/search`.
+- Do not read the `meme` D1 directly from the new service Worker.
+- Do not pass the upload token to Pages or the browser.
+- Do not use public image URLs as authentication or authorization checks.
 
-## 구현 체크리스트
+## Implementation Checklist
 
 ### meme
 
-- [ ] 새 서비스 전용 업로드 token 발급
-- [ ] 업로드 전용 `POST /v1/images` 구현
-- [ ] 기존 관리 token과 업로드 token의 권한 분리
-- [ ] raw body 스트리밍, 형식·크기·pixel 검증 구현
-- [ ] idempotency와 token 단위 rate limit 구현
-- [ ] 완성된 원본/미리보기 공개 URL 반환
-- [ ] 공개 이미지 hostname은 `GET`/`HEAD`만 허용
-- [ ] token 없음·오류, 과대 파일, 중복 요청과 origin 장애 테스트
+- [ ] Issue an upload token dedicated to the new service
+- [ ] Implement the upload-only `POST /v1/images`
+- [ ] Separate the permissions of the existing admin token and the upload token
+- [ ] Implement raw-body streaming and format, size, and pixel validation
+- [ ] Implement idempotency and per-token rate limiting
+- [ ] Return completed public URLs for the original and preview
+- [ ] Allow only `GET`/`HEAD` on the public image hostname
+- [ ] Test missing/invalid tokens, oversized files, duplicate requests, and origin failures
 
-### 새 서비스 Worker+D1
+### New service Worker+D1
 
-- [ ] 새 서비스 전용 D1을 Worker에 바인딩
-- [ ] `MEME_UPLOAD_TOKEN`을 Worker encrypted secret으로 등록
-- [ ] Pages 업로드를 받아 `meme`로 스트리밍
-- [ ] 응답의 hash, 확장자와 hostname 검증
-- [ ] 반환된 URL과 애플리케이션 메타데이터를 새 서비스 D1에 저장
-- [ ] 검색과 목록은 새 서비스 D1만 사용
-- [ ] 정확한 Pages origin만 허용하는 CORS 구현
-- [ ] 재시도에도 같은 `Idempotency-Key` 사용
-- [ ] token과 이미지 body가 로그에 남지 않는지 확인
+- [ ] Bind a D1 dedicated to the new service to the Worker
+- [ ] Register `MEME_UPLOAD_TOKEN` as a Worker encrypted secret
+- [ ] Receive Pages uploads and stream them to `meme`
+- [ ] Validate the response hash, extension, and hostname
+- [ ] Store the returned URLs and application metadata in the new service D1
+- [ ] Use only the new service D1 for search and listing
+- [ ] Implement CORS allowing only the exact Pages origin
+- [ ] Use the same `Idempotency-Key` on retries
+- [ ] Verify that tokens and image bodies do not appear in logs
 
 ### Pages
 
-- [ ] 정적 자산만 배포하고 업로드 token을 포함하지 않음
-- [ ] 업로드는 새 서비스 Worker만 호출
-- [ ] 이미지 표시는 반환된 공개 URL을 직접 사용
+- [ ] Deploy only static assets and do not include the upload token
+- [ ] Call only the new service Worker for uploads
+- [ ] Display images directly using the returned public URLs
 
-## 완료 조건
+## Completion Criteria
 
-1. 유효한 전용 token으로 이미지 업로드가 성공하고 공개 URL 두 개가 반환됩니다.
-2. token이 없거나 틀린 업로드는 `401`입니다.
-3. 같은 파일의 공개 URL은 로그인과 token 없이 `GET`/`HEAD`로 열립니다.
-4. Pages 번들과 브라우저 network 요청에 업로드 token이 없습니다.
-5. 새 서비스 로그인 유무가 `meme`의 업로드 인증과 이미지 조회에 영향을 주지
-   않습니다.
-6. 새 서비스 D1에 URL과 애플리케이션 메타데이터가 저장되고 목록·검색은 그 D1에서만
-   수행됩니다.
-7. 새 서비스는 기존 `meme` D1, Google session과 origin 관리 API를 사용하지 않습니다.
+1. An image upload with a valid dedicated token succeeds and returns two public URLs.
+2. An upload with a missing or incorrect token returns `401`.
+3. The public URL for the same file opens with `GET`/`HEAD` without login or a token.
+4. The upload token is absent from the Pages bundle and browser network requests.
+5. Whether the user is logged in to the new service does not affect `meme` upload authorization or image retrieval.
+6. The URLs and application metadata are stored in the new service D1, and listing and search run only against that D1.
+7. The new service does not use the existing `meme` D1, Google session, or origin-administration APIs.

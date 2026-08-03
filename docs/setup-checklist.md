@@ -1,33 +1,36 @@
-# 운영 설정 체크리스트
+# Operations Setup Checklist
 
-실제 ID, 도메인, 이메일과 토큰은 저장소에 기록하지 않습니다. 이전 Reddit 글에서
-VPC 구성을 찾아온 설치자는 [v1-vpc-final 릴리스](https://github.com/octopus7/meme/releases/tag/v1-vpc-final)를
-참조하고, 아래 체크리스트는 현재 직접 Tunnel 구조에 적용합니다.
+[한국어](setup-checklist.KO.md) | **English**
 
-## 1. Origin 설치
+Do not record real IDs, domains, email addresses, or tokens in the repository.
+Installers who found the VPC configuration in the previous Reddit post should refer
+to the [v1-vpc-final release](https://github.com/octopus7/meme/releases/tag/v1-vpc-final);
+the checklist below applies to the current direct Tunnel architecture.
 
-- [ ] Node origin `8086` 설치
-- [ ] `/volume1/docker/meme-origin`에 설치
-- [ ] Container Manager project와 health 상태 확인
-- [ ] 로컬 `/healthz` 성공 확인
-- [ ] origin mutation token 생성 및 백업 정책 확인
-- [ ] 라우터 포트 포워딩이 없는지 확인
+## 1. Origin installation
 
-## 2. Tunnel·CDN
+- [ ] Install Node origin on `8086`
+- [ ] Install it at `/volume1/docker/meme-origin`
+- [ ] Verify the Container Manager project and health status
+- [ ] Verify that local `/healthz` succeeds
+- [ ] Create the origin mutation token and verify its backup policy
+- [ ] Verify that the router has no port forwarding
 
-- [ ] Cloudflare Tunnel 생성 및 Synology에 `cloudflared` 설치
-- [ ] `img.example.com` → Node origin `8086` published route 생성
-- [ ] `origin-admin.example.com` → 같은 origin published route 생성
-- [ ] origin mutation Bearer token을 web Worker와 Synology에 동일하게 설정
-- [ ] `img.example.com`은 GET/HEAD `/i/*`, `/t/*`만 허용
-- [ ] `img.example.com/internal/*`, `/healthz`와 모든 쓰기 메서드 차단
-- [ ] `/i/*`, `/t/*` Cache Rule 생성(확장자 없는 `/t/{hash}` 포함)
-- [ ] 200/206 edge TTL 1년, 404/5xx 미캐시, query key 정책 확인
-- [ ] Zone cache purge API token 생성(태그 purge 최소 권한)
-- [ ] 이미지 origin 응답의 `Cache-Tag: blob-<sha256>` 확인
+## 2. Tunnel and CDN
 
-Workers VPC, VPC Service ID, `Connectivity Directory Bind`와 storage Worker는
-현재 구성에 필요하지 않습니다.
+- [ ] Create a Cloudflare Tunnel and install `cloudflared` on Synology
+- [ ] Create a published route from `img.example.com` to Node origin `8086`
+- [ ] Create a published route from `origin-admin.example.com` to the same origin
+- [ ] Set the origin mutation Bearer token identically in the web Worker and Synology
+- [ ] Allow only GET/HEAD for `/i/*` and `/t/*` on `img.example.com`
+- [ ] Block `img.example.com/internal/*`, `/healthz`, and all write methods
+- [ ] Create a Cache Rule for `/i/*` and `/t/*` (including extensionless `/t/{hash}`)
+- [ ] Verify one-year edge TTL for 200/206, no caching for 404/5xx, and the query-key policy
+- [ ] Create a Zone cache purge API token with minimum tag-purge permissions
+- [ ] Verify `Cache-Tag: blob-<sha256>` in image origin responses
+
+Workers VPC, VPC Service ID, `Connectivity Directory Bind`, and the storage Worker
+are not required by the current architecture.
 
 ## 3. GitHub Environments
 
@@ -48,13 +51,13 @@ Variables:
 - [ ] `CF_ZONE_ID`
 - [ ] `GOOGLE_CLIENT_ID`
 - [ ] `GOOGLE_REDIRECT_URI=https://<APP_DOMAIN>/auth/callback`
-- [ ] `GOOGLE_ALLOWED_EMAILS=<관리자 이메일 하나>`
+- [ ] `GOOGLE_ALLOWED_EMAILS=<one administrator email>`
 
 Cloudflare web Worker encrypted secrets:
 
 - [ ] `GOOGLE_CLIENT_SECRET`
 - [ ] `AUTH_SESSION_SECRET`
-- [ ] `ORIGIN_ADMIN_TOKEN` (origin mutation token과 동일)
+- [ ] `ORIGIN_ADMIN_TOKEN` (same as the origin mutation token)
 - [ ] `CF_CACHE_PURGE_TOKEN`
 
 ### `d1-production`
@@ -69,31 +72,31 @@ Variables:
 - [ ] `D1_DATABASE_NAME`
 - [ ] `D1_DATABASE_ID`
 
-`storage-production`, `STORAGE_WORKER_NAME`, `VPC_SERVICE_ID`,
-`ORIGIN_BASE_URL`은 새 배포에 만들지 않습니다.
+Do not create `storage-production`, `STORAGE_WORKER_NAME`, `VPC_SERVICE_ID`, or
+`ORIGIN_BASE_URL` for a new deployment.
 
-## 4. 배포와 기능 점검
+## 4. Deployment and feature checks
 
-- [ ] `Migrate D1` 실행(`image_url_exposure_logs` 포함)
-- [ ] `Deploy web Worker` 실행
-- [ ] web Worker에 `app.example.com` Custom Domain 연결
-- [ ] Tunnel route와 Cache Rule이 배포 후에도 유지되는지 확인
-- [ ] 인증 없는 브라우저가 Google 인증 화면으로 이동하는지 확인
-- [ ] 관리자 계정으로 목록, 검색, 업로드가 동작하는지 확인
-- [ ] `/all`·`/search`의 이미지 URL이 `img.example.com`을 가리키는지 확인
-- [ ] 노출 기록에 시각·파일명·용량·화면·viewer sub가 남는지 확인
-- [ ] `img.example.com/i/...`와 `/t/...`가 인증 없이 GET/HEAD 동작하는지 확인
-- [ ] 두 번째 요청에서 `Cf-Cache-Status: HIT`인지 확인
-- [ ] `img.example.com/internal/*`가 차단되고 `origin-admin` mutation token이 검증되는지 확인
-- [ ] 마지막 참조 삭제가 origin trash 이동 → cache-tag purge → D1 확정 순서인지 확인
-- [ ] purge 후 새 네트워크 요청에서 이미지 URL이 404인지 확인(브라우저 로컬 캐시는 남을 수 있음)
-- [ ] 관리자 `/exposures` 화면에서 기간 조회와 cursor pagination 확인
-- [ ] 일반 회원에게 관리자 화면과 노출 기록이 노출되지 않는지 확인
+- [ ] Run `Migrate D1` (including `image_url_exposure_logs`)
+- [ ] Run `Deploy web Worker`
+- [ ] Connect the `app.example.com` Custom Domain to the web Worker
+- [ ] Verify that the Tunnel route and Cache Rule remain after deployment
+- [ ] Verify that an unauthenticated browser is redirected to the Google sign-in screen
+- [ ] Verify that list, search, and upload work with an administrator account
+- [ ] Verify that image URLs in `/all` and `/search` point to `img.example.com`
+- [ ] Verify that exposure records contain the time, filename, size, screen, and viewer sub
+- [ ] Verify unauthenticated GET/HEAD behavior for `img.example.com/i/...` and `/t/...`
+- [ ] Verify `Cf-Cache-Status: HIT` on the second request
+- [ ] Verify that `img.example.com/internal/*` is blocked and the `origin-admin` mutation token is validated
+- [ ] Verify the last-reference deletion order: origin trash move → cache-tag purge → D1 finalization
+- [ ] Verify that a new network request returns 404 after purge (the browser local cache may remain)
+- [ ] Verify period queries and cursor pagination on the administrator `/exposures` screen
+- [ ] Verify that regular members cannot see the administrator screen or exposure records
 
-## 5. 장애·운영 시험
+## 5. Failure and operations tests
 
-- [ ] origin mutation token 누락·오류 시 관리 API가 거부되는지 확인
-- [ ] origin mutation token 불일치 시 업로드·삭제가 거부되는지 확인
-- [ ] Cloudflare purge 실패 시 `trash_pending`으로 남고 cron이 재시도하는지 확인
-- [ ] D1 장애 중에도 이미지 응답과 목록 응답이 실패하지 않는지 확인
-- [ ] Tunnel 중단, 디스크 부족, 30일 purge를 별도 시험 데이터로 검증
+- [ ] Verify that the management API rejects missing or invalid origin mutation tokens
+- [ ] Verify that upload and deletion are rejected when origin mutation tokens do not match
+- [ ] Verify that a failed Cloudflare purge remains `trash_pending` and is retried by cron
+- [ ] Verify that image and list responses do not fail during a D1 outage
+- [ ] Validate Tunnel interruption, low disk space, and the 30-day purge with separate test data

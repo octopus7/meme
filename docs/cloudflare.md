@@ -1,97 +1,83 @@
-# Cloudflare 인프라
+# Cloudflare infrastructure
 
-계정별 값은 Cloudflare 대시보드와 GitHub Environment에만 둡니다. 실제 도메인,
-account/zone/database ID와 API token은 저장소에 기록하지 않습니다.
+[한국어](cloudflare.KO.md) | **English**
+
+Account-specific values are kept only in the Cloudflare dashboard and GitHub Environment. Actual domains, account/zone/database IDs, and API tokens are not recorded in the repository.
 
 ## D1
 
-D1에는 물리 blob, 컬렉션 항목, 이미지 URL 노출 기록을 저장합니다. migration의 기준
-원본은 `database/d1/migrations`이며 운영 migration은 Worker 배포와 분리된 수동
-워크플로로 적용합니다.
+D1 stores physical blobs, collection items, and image URL exposure logs. The source of truth for migrations is `database/d1/migrations`, and production migrations are applied by a manual workflow separate from Worker deployment.
 
 ```text
-blob: SHA-256, canonical extension, MIME, size, active/trashed 상태
-item: 소유자 식별값, blob hash, 설명, 원래 파일명, 생성/삭제 시각
-image_url_exposure_logs: URL을 HTML 응답에 포함한 시각, 항목, 파일명, byte 크기, 화면, viewer sub
+blob: SHA-256, canonical extension, MIME, size, active/trashed status
+item: owner identifier, blob hash, description, original filename, creation/deletion timestamps
+image_url_exposure_logs: timestamp when URL was included in an HTML response, item, filename, byte size, screen, viewer sub
 ```
 
-노출 기록은 실제 이미지 요청·다운로드·Cloudflare cache HIT를 의미하지 않습니다.
-web Worker가 `/all` 또는 `/search` 응답에 이미지 URL을 포함한 시점만 기록합니다.
+Exposure logs do not mean that an actual image request, download, or Cloudflare cache HIT occurred. The log records only when the web Worker includes an image URL in an `/all` or `/search` response.
 
-데이터베이스는 한 번만 생성합니다.
+Create the database only once.
 
 ```bash
 npx wrangler@latest d1 create <D1_DATABASE_NAME>
 ```
 
-반환된 이름과 ID를 `web-production`, `d1-production` Environment의
-`D1_DATABASE_NAME`, `D1_DATABASE_ID`에 동일하게 저장합니다.
+Store the returned name and ID identically as `D1_DATABASE_NAME` and `D1_DATABASE_ID` in the `web-production` and `d1-production` Environments.
 
-## Tunnel 및 공개 이미지 hostname
+## Tunnel and public image hostnames
 
-Workers VPC와 VPC Service는 사용하지 않습니다. Synology의 Node origin은
-Cloudflare Tunnel의 private network 뒤에 두고, 두 개의 published hostname을
-같은 origin 포트(기본 `8086`)로 연결합니다.
+Workers VPC and VPC Service are not used. Place the Synology Node origin behind the private network of a Cloudflare Tunnel, and connect two published hostnames to the same origin port (default `8086`).
 
 ```text
 img.example.com
-  공개 GET/HEAD /i/*, /t/*
+  public GET/HEAD /i/*, /t/*
   Cloudflare CDN → Tunnel → Synology origin
 
 origin-admin.example.com
-  공개 관리 hostname, Bearer token 필요
+  public administrative hostname, Bearer token required
   web Worker → Tunnel → Synology /internal/*
 ```
 
-NAS 라우터에 포트 포워딩을 만들지 않습니다. Tunnel connector는 Synology에서
-실행하고 토큰은 Linux 서비스 자격 증명에만 보관합니다. SSH, DSM UI와 그 밖의
-관리 포트를 Tunnel public hostname에 노출하지 않습니다.
+Do not create port forwarding on the NAS router. Run the Tunnel connector on Synology and keep its token only in Linux service credentials. Do not expose SSH, the DSM UI, or other administrative ports through the Tunnel public hostname.
 
-`img.example.com`은 다음 요청만 허용합니다.
+`img.example.com` allows only the following requests:
 
-- `GET`, `HEAD`의 `/i/*`, `/t/*`
-- 그 밖의 경로(`/internal/*`, `/healthz`)와 쓰기 메서드는 차단
+- `GET` and `HEAD` for `/i/*` and `/t/*`
+- Block other paths (`/internal/*`, `/healthz`) and write methods at the edge
 
-`origin-admin.example.com`은 공개 published hostname입니다. 관리 API mutation은
-origin bearer token을 요구하고 web Worker만 이 token을 보냅니다.
+`origin-admin.example.com` is a public published hostname. Administrative API mutations require the origin bearer token, and only the web Worker sends this token.
 
 ```http
 Authorization: Bearer <origin mutation token>
 ```
 
-origin에서는 bearer token을 검증하며, 가능하면 Host와 허용 경로도 검증합니다.
+The origin validates the bearer token and, when possible, also validates Host and the allowed path.
 
-## 공개 이미지 CDN 캐시
+## Public image CDN cache
 
-공개 이미지는 storage Worker를 거치지 않고 Cloudflare CDN이 캐시합니다. Cache
-Rules에서 `img.example.com`의 `/i/*`, `/t/*`를 명시적으로 cache eligible로
-설정합니다(`/t/{hash}`는 확장자가 없으므로 반드시 규칙에 포함합니다).
+Public images are cached by the Cloudflare CDN without going through a storage Worker. In Cache Rules, explicitly mark `/i/*` and `/t/*` on `img.example.com` as cache eligible (the extensionless `/t/{hash}` path must be included explicitly).
 
-정상 이미지 응답은 origin에서 다음 헤더를 보냅니다.
+Normal image responses send the following headers from the origin.
 
 ```http
 Cache-Control: public, max-age=31536000, immutable
 Cache-Tag: blob-<sha256>
 ```
 
-브라우저의 장기 캐시는 허용합니다. 삭제 시 브라우저 캐시는 원격 purge할 수
-없지만, Cloudflare edge 캐시는 Zone Purge API로 `blob-<sha256>` 태그를 지웁니다.
-404·401·4xx·5xx는 `Cache-Control: no-store`로 반환하고 장기 저장하지 않습니다.
-query string은 캐시 키에 넣지 않거나 공개 경로에서 거부하고, GET/HEAD 외 메서드는
-캐시하지 않습니다.
+Long-lived browser caching is allowed. Browser caches cannot be purged remotely on deletion, but the Cloudflare edge cache is cleared with the `blob-<sha256>` tag through the Zone Purge API. Return 404, 401, 4xx, and 5xx responses with `Cache-Control: no-store` and do not store them long-term. Either omit the query string from the cache key or reject it on public paths, and do not cache methods other than GET/HEAD.
 
-삭제 순서는 반드시 다음과 같습니다.
+The deletion order must be as follows.
 
 ```text
 D1 trash_pending
-→ origin-admin의 active → trash 이동
+→ origin-admin active → trash move
 → Cloudflare Zone purge_cache(tags=[blob-<hash>])
 → D1 trashed
 ```
 
-Purge 실패 시 `trash_pending`을 유지해 web Worker cron이 재시도합니다.
+If purge fails, keep `trash_pending` so the web Worker cron can retry it.
 
-공식 문서:
+Official documentation:
 
 - [Cloudflare Tunnel routing](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/routing-to-tunnel/)
 - [Cache Rules](https://developers.cloudflare.com/cache/how-to/cache-rules/)
@@ -99,37 +85,32 @@ Purge 실패 시 `trash_pending`을 유지해 web Worker cron이 재시도합니
 
 ## web Worker
 
-web Worker는 `cache.enabled=false`로 배포하며 D1만 바인딩합니다.
+Deploy the web Worker with `cache.enabled=false` and bind only D1.
 
 ```text
 DB  D1 database
 ```
 
-이미지 URL은 `IMAGE_ORIGIN`을 기준으로 만들고 실제 이미지 GET은 Worker에 들어오지
-않습니다. 업로드·삭제·복구 관련 origin 관리 요청은 `ORIGIN_ADMIN_BASE_URL`로
-직접 HTTPS fetch합니다.
+Build image URLs from `IMAGE_ORIGIN`; actual image GET requests do not enter the Worker. Fetch origin administration requests for upload, deletion, and restoration directly over HTTPS using `ORIGIN_ADMIN_BASE_URL`.
 
-## 도메인과 secret
+## Domains and secrets
 
-Custom Domain, Tunnel hostname과 Cache Rule은
-대시보드에서 설정합니다. Wrangler 파일이나 소스에 실제 값은 넣지 않습니다.
+Configure the Custom Domain, Tunnel hostnames, and Cache Rule in the dashboard. Do not put actual values in Wrangler files or source code.
 
-GitHub `web-production` 변수:
+GitHub `web-production` variables:
 
 - `CF_ACCOUNT_ID`, `WEB_WORKER_NAME`
 - `D1_DATABASE_NAME`, `D1_DATABASE_ID`
-- `IMAGE_ORIGIN` (예: `https://img.example.com`)
-- `ORIGIN_ADMIN_BASE_URL` (예: `https://origin-admin.example.com`)
+- `IMAGE_ORIGIN` (for example, `https://img.example.com`)
+- `ORIGIN_ADMIN_BASE_URL` (for example, `https://origin-admin.example.com`)
 - `CF_ZONE_ID`
-- Google OAuth 관련 변수
+- Google OAuth-related variables
 
 web Worker encrypted secrets:
 
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SESSION_SECRET`
-- `ORIGIN_ADMIN_TOKEN` (origin의 mutation token과 동일)
-- `CF_CACHE_PURGE_TOKEN` (대상 Zone의 Cache Purge 권한만)
+- `ORIGIN_ADMIN_TOKEN` (the same as the origin mutation token)
+- `CF_CACHE_PURGE_TOKEN` (only Cache Purge permission for the target Zone)
 
-GitHub Actions의 `CLOUDFLARE_API_TOKEN`은 web Worker 배포 및 D1 migration
-Environment에서 각각 최소 권한으로 관리합니다. origin token과 purge token은
-GitHub 로그나 저장소에 노출하지 않습니다.
+Manage `CLOUDFLARE_API_TOKEN` from GitHub Actions with minimum permissions in the web Worker deployment and D1 migration Environments respectively. Do not expose the origin token or purge token in GitHub logs or the repository.

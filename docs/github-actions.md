@@ -1,127 +1,106 @@
-# GitHub Actions 설정과 배포 격리
+# GitHub Actions configuration and deployment isolation
 
-현재 구성에서는 storage Worker와 Workers VPC 배포가 없습니다. GitHub repository의
-**Settings → Environments**에서 다음 Environment만 운영용으로 만듭니다.
+[한국어](github-actions.KO.md) | **English**
+
+The current configuration has no storage Worker or Workers VPC deployment. In **Settings → Environments** for the GitHub repository, create only the following Environments for production use.
 
 ```text
 web-production
 d1-production
 ```
 
-`Build origin`은 서버에 배포하지 않고 Docker 검증 artifact만 생성합니다. 운영
-배포 Environment에는 required reviewer와 main branch protection을 권장합니다.
-Linux 서버용 SSH key와 Tunnel token은 어느 Worker Environment에도 넣지 않습니다.
+`Build origin` does not deploy to the server; it only creates a Docker validation artifact. For production deployment Environments, required reviewers and main-branch protection are recommended. Do not put Linux server SSH keys or the Tunnel token in any Worker Environment.
 
-## Environment 값
+## Environment values
 
 ### web-production
 
-| 종류 | 이름 | 내용 |
+| Type | Name | Content |
 |---|---|---|
-| secret | `CLOUDFLARE_API_TOKEN` | web Worker 배포만 가능한 최소 권한 token |
+| secret | `CLOUDFLARE_API_TOKEN` | Minimum-permission token that can deploy only the web Worker |
 | variable | `CF_ACCOUNT_ID` | Cloudflare account ID |
-| variable | `WEB_WORKER_NAME` | web Worker script 이름 |
-| variable | `D1_DATABASE_NAME` | D1 표시 이름 |
+| variable | `WEB_WORKER_NAME` | web Worker script name |
+| variable | `D1_DATABASE_NAME` | D1 display name |
 | variable | `D1_DATABASE_ID` | D1 database ID |
-| variable | `IMAGE_ORIGIN` | 공개 이미지 origin, 예: `https://img.example.com` |
-| variable | `ORIGIN_ADMIN_BASE_URL` | Bearer token으로 보호하는 관리 hostname, 예: `https://origin-admin.example.com` |
-| variable | `CF_ZONE_ID` | 이미지 Zone ID |
+| variable | `IMAGE_ORIGIN` | Public image origin, for example `https://img.example.com` |
+| variable | `ORIGIN_ADMIN_BASE_URL` | Administrative hostname protected by a Bearer token, for example `https://origin-admin.example.com` |
+| variable | `CF_ZONE_ID` | Image Zone ID |
 | variable | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | variable | `GOOGLE_REDIRECT_URI` | `https://<APP_DOMAIN>/auth/callback` |
-| variable | `GOOGLE_ALLOWED_EMAILS` | 관리자 이메일 하나 |
+| variable | `GOOGLE_ALLOWED_EMAILS` | One administrator email |
 
 Cloudflare web Worker encrypted secrets:
 
-| 이름 | 내용 |
+| Name | Content |
 |---|---|
 | `GOOGLE_CLIENT_SECRET` | Google OAuth secret |
-| `AUTH_SESSION_SECRET` | 세션 서명용 무작위 secret |
-| `ORIGIN_ADMIN_TOKEN` | origin `MEME_ORIGIN_MUTATION_TOKEN`과 동일한 bearer token |
-| `CF_CACHE_PURGE_TOKEN` | 대상 Zone의 Cache Purge만 허용하는 API token |
+| `AUTH_SESSION_SECRET` | Random secret for signing sessions |
+| `ORIGIN_ADMIN_TOKEN` | Bearer token identical to origin `MEME_ORIGIN_MUTATION_TOKEN` |
+| `CF_CACHE_PURGE_TOKEN` | API token that permits only Cache Purge for the target Zone |
 
-`ORIGIN_ADMIN_TOKEN`, purge token은 GitHub 변수로 만들지 않습니다.
-배포 workflow는 secret을 출력하거나 `wrangler secret put`으로 덮어쓰지 않고,
-Cloudflare Worker Settings에 등록된 값을 `--keep-vars`로 보존합니다.
+Do not create `ORIGIN_ADMIN_TOKEN` or the purge token as GitHub variables. The deployment workflow does not print secrets or overwrite them with `wrangler secret put`; it preserves the values registered in Cloudflare Worker Settings with `--keep-vars`.
 
 ### d1-production
 
-| 종류 | 이름 | 내용 |
+| Type | Name | Content |
 |---|---|---|
-| secret | `CLOUDFLARE_API_TOKEN` | 해당 D1에 migration 가능한 최소 권한 token |
+| secret | `CLOUDFLARE_API_TOKEN` | Minimum-permission token that can run migrations on the target D1 only |
 | variable | `CF_ACCOUNT_ID` | Cloudflare account ID |
-| variable | `D1_DATABASE_NAME` | migration 대상 D1 이름 |
-| variable | `D1_DATABASE_ID` | migration 대상 D1 ID |
+| variable | `D1_DATABASE_NAME` | Target D1 name for migration |
+| variable | `D1_DATABASE_ID` | Target D1 ID for migration |
 
-account ID와 resource ID는 비밀 credential은 아니지만 저장소에 고정하지 않도록
-GitHub variables로 관리합니다. API token은 반드시 secret으로 관리합니다.
+Manage the account ID and resource ID as GitHub variables so they are not hard-coded in the repository, even though they are not secret credentials. Always manage API tokens as secrets.
 
-## Token 최소 권한
+## Minimum token permissions
 
-각 token의 resource scope를 운영 account와 필요한 Zone/database로 제한합니다.
+Limit each token's resource scope to the production account and the required Zone/database.
 
 - `web-production`: Account → Workers Scripts → Edit
-- `web-production`의 `CF_CACHE_PURGE_TOKEN`: 대상 Zone → Cache Purge → Purge by
-  cache-tag만 허용
+- `CF_CACHE_PURGE_TOKEN` in `web-production`: target Zone → Cache Purge → allow only Purge by cache-tag
 - `d1-production`: Account → D1 → Edit
 
-Tunnel connector token은 Cloudflare 대시보드와 Synology에만 설정합니다. Workers
-VPC의 `Connectivity Directory Bind`, VPC Service ID, storage Worker용 배포 token은
-더 이상 필요하지 않습니다.
+Configure the Tunnel connector token only in the Cloudflare dashboard and on Synology. `Connectivity Directory Bind` for Workers VPC, the VPC Service ID, and deployment tokens for a storage Worker are no longer needed.
 
-공식 참고:
+Official references:
 
-- [API token 생성](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
-- [API token 권한 목록](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
+- [Create an API token](https://developers.cloudflare.com/fundamentals/api/get-started/create-token/)
+- [API token permissions](https://developers.cloudflare.com/fundamentals/api/reference/permissions/)
 - [Cache purge API](https://developers.cloudflare.com/api/resources/cache/methods/purge/)
 
-## Workflow별 영향 범위
+## Scope of each workflow
 
-| Workflow | trigger | 변경 대상 |
+| Workflow | Trigger | Changed target |
 |---|---|---|
-| `Deploy web Worker` | `workers/web/**` push 또는 수동 | web Worker만 |
-| `Build origin` | `origin/**` push/PR 또는 수동 | Node.js 24 Docker 검증 및 Linux x64 artifact만 |
-| `Migrate D1` | 수동 | D1 schema만 |
+| `Deploy web Worker` | Push to `workers/web/**` or manual | web Worker only |
+| `Build origin` | Push/PR to `origin/**` or manual | Node.js 24 Docker validation and Linux x64 artifact only |
+| `Migrate D1` | Manual | D1 schema only |
 
-`Deploy storage Worker` workflow와 `render-storage-wrangler.mjs`는 제거합니다.
-각 deploy job은 자기 디렉터리에서만 `npm ci`와 Wrangler를 실행하며, 런타임에
-`.wrangler.generated.jsonc`를 만들고 종료 시 삭제합니다. 해당 파일은 `.gitignore`에도
-포함되어 있습니다.
+Remove the `Deploy storage Worker` workflow and `render-storage-wrangler.mjs`. Each deployment job runs `npm ci` and Wrangler only in its own directory, creates `.wrangler.generated.jsonc` at runtime, and deletes it on exit. The file is also included in `.gitignore`.
 
-Custom Domain, Tunnel route와 Cache Rule 생성은
-workflow가 변경하지 않습니다. Cloudflare 대시보드에서 먼저 만들고 smoke test로
-확인합니다. Worker 배포가 Linux 파일을 복사·삭제하거나 서비스를 재시작하는
-단계도 없습니다.
+The workflow does not create or change Custom Domains, Tunnel routes, or Cache Rules. Create them first in the Cloudflare dashboard and confirm them with a smoke test. Worker deployment also has no step that copies or deletes Linux files or restarts services.
 
-origin workflow는 Node.js 24에서 `npm ci`, test, Linux x64용 `sharp` 로드와 Docker
-image build를 검증하고 artifact만 생성합니다. 서버 접속 credential은 사용하지
-않습니다.
+The origin workflow validates `npm ci`, tests, loading `sharp` for Linux x64, and Docker image building on Node.js 24, then creates only an artifact. It does not use server-access credentials.
 
 ## D1 migration
 
-`Migrate D1`은 `workflow_dispatch`만 허용하며 `d1-production` 승인을 거칩니다.
-실행 전에 Cloudflare D1 export 등 운영 정책에 맞는 backup을 확보합니다.
-migration은 되돌릴 수 있는 additive 변경을 우선하고, Worker와 호환되지 않는
-column/table 제거는 별도 release로 나눕니다.
+`Migrate D1` allows only `workflow_dispatch` and requires approval for `d1-production`. Before running it, secure a backup that follows the operating policy, such as a Cloudflare D1 export. Prefer reversible additive migrations, and split removal of columns or tables incompatible with the Worker into a separate release.
 
-권장 배포 순서:
+Recommended deployment order:
 
 ```text
 additive D1 migration
 → web Worker
 → smoke test (Tunnel, CDN cache, purge, exposure log)
-→ 후속 정리 migration
+→ follow-up cleanup migration
 ```
 
-`image_url_exposure_logs`는 web Worker가 `/all`·`/search` HTML에 이미지 URL을
-포함한 시점을 기록하는 테이블입니다. 실제 브라우저 다운로드나 CDN HIT를 의미하지
-않으며, 90일 보존 후 web Worker cron이 bounded batch로 정리합니다.
+`image_url_exposure_logs` records when the web Worker includes an image URL in `/all` or `/search` HTML. It does not represent an actual browser download or CDN HIT; after 90 days, the web Worker cron cleans it up in bounded batches.
 
-## Runtime secret 점검
+## Runtime secret check
 
-배포 전에 다음을 확인합니다.
+Verify the following before deployment.
 
-1. `ORIGIN_ADMIN_BASE_URL`이 `https://`이고 관리 hostname을 가리킵니다.
-2. `ORIGIN_ADMIN_TOKEN`이 origin의 mutation token과 일치합니다.
-3. `CF_ZONE_ID`가 `IMAGE_ORIGIN`의 Zone이고, purge token이 해당 Zone의 tag purge만
-   수행할 수 있습니다.
-4. secret 값이 workflow 로그, generated Wrangler 파일, 커밋에 나타나지 않습니다.
+1. `ORIGIN_ADMIN_BASE_URL` uses `https://` and points to the administrative hostname.
+2. `ORIGIN_ADMIN_TOKEN` matches the origin mutation token.
+3. `CF_ZONE_ID` is the Zone for `IMAGE_ORIGIN`, and the purge token can perform only tag purges for that Zone.
+4. Secret values do not appear in workflow logs, generated Wrangler files, or commits.

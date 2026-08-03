@@ -1,11 +1,11 @@
 # meme-origin
 
-[한국어](README.ko.md) | **English**
+[한국어](README.KO.md) | **English**
 
 Private Node.js image origin for the Meme Workers. It validates JPEG, PNG,
 WebP, and GIF uploads with `sharp`, stores originals by SHA-256, and generates
-autorotated, center-cropped 128×128 WebP thumbnails. Image processing is
-serialized by default for the J1900.
+automatically rotated, center-cropped 128×128 WebP thumbnails. Image processing
+is serialized by default for the J1900.
 
 ## Synology Container Manager
 
@@ -23,8 +23,9 @@ chmod 0600 .env
 mkdir -p data logs
 ```
 
-Replace the placeholder mutation token and set `PUID`/`PGID` to the DSM user
-that owns `data` and `logs`. In Container Manager, select **Project → Create**,
+Replace the placeholder mutation token with a random value of at least 32
+characters, and set `PUID`/`PGID` to the DSM user that owns `data` and `logs`.
+In Container Manager, select **Project → Create**,
 choose `/volume1/docker/meme-origin/compose.yaml`, build, and start it.
 
 The project provides:
@@ -38,7 +39,7 @@ The project provides:
 
 Cloudflare Tunnel on the NAS can reach `http://127.0.0.1:8086`. The public image
 hostname and the Access-protected admin hostname may target this local service,
-but do not expose the mutation API directly through a router port-forward.
+but do not expose the mutation API directly through router port forwarding.
 
 ### Install or update from a public GitHub archive without Git
 

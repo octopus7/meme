@@ -1,13 +1,15 @@
-# Google 인증 웹 Worker
+# Google-Authenticated Web Worker
 
-이 디렉터리는 독립적으로 배포됩니다. Cloudflare account ID, D1 ID, 호스트명과
-API token은 저장하지 않습니다.
+[한국어](README.KO.md) | **English**
 
-## 설정 생성
+This directory is deployed independently. Do not store the Cloudflare account ID,
+D1 ID, hostnames, or API token here.
 
-CI는 GitHub Environment 변수로 아래 값을 제공한 뒤
-`.github/scripts/render-web-wrangler.mjs`를 실행합니다. 생성되는
-`.wrangler.generated.jsonc`와 Worker 타입 파일은 Git에서 무시됩니다.
+## Generate configuration
+
+CI provides the following values through GitHub Environment variables and then runs
+`.github/scripts/render-web-wrangler.mjs`. The generated `.wrangler.generated.jsonc`
+and Worker type files are ignored by Git.
 
 - `WEB_WORKER_NAME`
 - `IMAGE_ORIGIN`
@@ -19,46 +21,46 @@ CI는 GitHub Environment 변수로 아래 값을 제공한 뒤
 - `GOOGLE_REDIRECT_URI`
 - `GOOGLE_ALLOWED_EMAILS`
 
-`CLOUDFLARE_API_TOKEN`은 GitHub Environment secret으로, `CF_ACCOUNT_ID`는
-Environment variable로 관리합니다. 다음 값은 web Worker의 Cloudflare encrypted
-secret으로 직접 등록합니다.
+Manage `CLOUDFLARE_API_TOKEN` as a GitHub Environment secret and `CF_ACCOUNT_ID` as
+an Environment variable. Register the following values directly as Cloudflare
+encrypted secrets for the web Worker.
 
 - `GOOGLE_CLIENT_SECRET`
 - `AUTH_SESSION_SECRET`
 - `ORIGIN_ADMIN_TOKEN`
 - `CF_CACHE_PURGE_TOKEN`
 
-`ORIGIN_ADMIN_TOKEN`은 origin의 `MEME_ORIGIN_MUTATION_TOKEN`과 동일해야 합니다.
-`origin-admin.example.com` 관리 요청은 이 bearer token으로 인증하고, purge token은
-이미지 Zone의 cache-tag purge만 허용합니다. 자세한 발급 및 URL
-설정은 `docs/cloudflare.md`, `docs/google-oauth.md`를 참고합니다.
+`ORIGIN_ADMIN_TOKEN` must match the origin's `MEME_ORIGIN_MUTATION_TOKEN`. Management
+requests to `origin-admin.example.com` authenticate with this bearer token, while the
+purge token permits only cache-tag purges for the image Zone. See
+`docs/cloudflare.md` and `docs/google-oauth.md` for detailed issuance and URL setup.
 
-## 런타임 역할
+## Runtime responsibilities
 
-이미지 조회는 web Worker가 처리하지 않습니다.
+The web Worker does not handle image retrieval.
 
 ```text
-목록·검색 HTML
-  web Worker → IMAGE_ORIGIN URL 포함 → D1 노출 기록
+List/search HTML
+  web Worker → include IMAGE_ORIGIN URL → D1 exposure log
 
-이미지 GET
-  브라우저 → Cloudflare CDN → Tunnel → Synology origin(캐시 MISS일 때만)
+Image GET
+  Browser → Cloudflare CDN → Tunnel → Synology origin (only on cache MISS)
 ```
 
-`IMAGE_ORIGIN`은 `https://img.example.com`처럼 공개 이미지 CDN hostname이어야
-합니다. 브라우저가 이 URL을 실제로 요청했는지, 로컬 캐시에서 읽었는지, CDN HIT인지
-는 web Worker에서 알 수 없습니다.
+`IMAGE_ORIGIN` must be a public image CDN hostname such as
+`https://img.example.com`. The web Worker cannot tell whether the browser actually
+requested this URL, read it from the local cache, or received a CDN HIT.
 
-업로드·삭제·복구 같은 관리 요청은 `ORIGIN_ADMIN_BASE_URL`로 직접 HTTPS fetch합니다.
-web Worker는 다음 헤더를 보냅니다.
+Management requests such as upload, deletion, and recovery use a direct HTTPS fetch
+to `ORIGIN_ADMIN_BASE_URL`. The web Worker sends this header:
 
 ```http
 Authorization: Bearer <origin mutation token>
 ```
 
-별도 image Worker 서비스 바인딩이나 Workers VPC binding은 사용하지 않습니다. 업로드는
-원본 이미지 스트림을 origin의 `POST /internal/v1/blobs`로 전달하고, 마지막 참조
-삭제는 다음 순서로 처리합니다.
+Do not use a separate image Worker service binding or Workers VPC binding. Uploads
+forward the original image stream to the origin's `POST /internal/v1/blobs`, and
+deletion of the last reference follows this order:
 
 ```text
 D1 trash_pending
@@ -67,25 +69,25 @@ D1 trash_pending
 → D1 trashed
 ```
 
-purge가 실패하면 `trash_pending`으로 남겨 cron이 재시도합니다. origin과 purge가
-완료되기 전에는 삭제를 확정하지 않습니다.
+If the purge fails, leave the item as `trash_pending` for cron to retry. Do not
+finalize the deletion before the origin operation and purge are complete.
 
-`/all`과 `/search`에서 이미지 URL을 HTML에 포함할 때 다음 정보를
-`image_url_exposure_logs`에 best-effort로 기록합니다.
+When `/all` and `/search` include image URLs in HTML, record the following information
+in `image_url_exposure_logs` on a best-effort basis.
 
 ```text
 exposed_at, image_item_id, blob_hash, original_filename,
 byte_size, exposure_context, viewer_sub
 ```
 
-이 기록은 다운로드·요청·cache HIT가 아닌 URL 노출 시각입니다. 관리자 화면의
-`/exposures`에서 기간 조회와 cursor pagination을 제공하고, 10분 cron이 90일이
-지난 행을 bounded batch로 정리합니다. 기록 실패는 사용자 페이지 응답을 막지
-않습니다.
+This record is the time of URL exposure, not a download, request, or cache HIT. The
+administrator screen provides period queries and cursor pagination at `/exposures`,
+and a 10-minute cron cleans up rows older than 90 days in bounded batches. A logging
+failure does not block the user page response.
 
-## 로컬 검사
+## Local checks
 
-테스트용 Environment 변수로 설정 파일을 생성한 다음 실행합니다.
+Generate the configuration file with test Environment variables, then run:
 
 ```sh
 node ../../.github/scripts/render-web-wrangler.mjs .wrangler.generated.jsonc
@@ -96,9 +98,11 @@ npm test
 npx wrangler deploy --config .wrangler.generated.jsonc --dry-run
 ```
 
-생성된 `.wrangler.generated.jsonc`와 `src/worker-configuration.d.ts`는 검사 후
-삭제합니다. 실제 secret은 로컬 파일이나 명령행에 기록하지 않습니다.
+Delete the generated `.wrangler.generated.jsonc` and
+`src/worker-configuration.d.ts` after checking. Do not record real secrets in local
+files or command lines.
 
-업로드 본문은 multipart가 아닌 원본 이미지 스트림입니다. 설명과 원래 파일명은
-브라우저가 URL 인코딩한 요청 헤더로 전달하므로 Worker가 이미지 전체를 버퍼링하지
-않고 origin 관리 hostname으로 전달할 수 있습니다.
+The upload body is the original image stream, not multipart. The browser sends the
+description and original filename in URL-encoded request headers, so the Worker can
+forward the image to the origin management hostname without buffering the entire
+image.

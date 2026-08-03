@@ -1,5 +1,7 @@
 # Google OAuth setup
 
+[한국어](google-oauth.KO.md) | **English**
+
 The web Worker uses Google OpenID Connect. `GOOGLE_ALLOWED_EMAILS` contains
 exactly one verified administrator email. The administrator can enable or
 disable login for all other verified Google accounts from the private admin

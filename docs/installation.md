@@ -1,94 +1,77 @@
-# 설치 순서
+# Installation steps
 
-이 문서는 현재의 직접 이미지 CDN + Tunnel 구성을 최초로 만드는 순서입니다.
-모든 `<PLACEHOLDER>`는 운영자가 직접 만든 값으로 바꾸되 저장소에는 기록하지
-않습니다.
+[한국어](installation.KO.md) | **English**
 
-이전 Reddit 글을 보고 VPC 기반 구성을 찾은 경우에는 [v1-vpc-final 릴리스](https://github.com/octopus7/meme/releases/tag/v1-vpc-final)를
-사용하세요. 이 문서와 `main`은 현재 구조를 기준으로 합니다.
+This document describes the steps to create the current direct image CDN + Tunnel configuration for the first time. Replace every `<PLACEHOLDER>` with a value created by the operator, but do not record those values in the repository.
 
-## 준비 사항
+If you arrived here from an earlier Reddit post looking for the VPC-based configuration, use the [v1-vpc-final release](https://github.com/octopus7/meme/releases/tag/v1-vpc-final). This document and `main` describe the current architecture.
 
-- Cloudflare에 연결된 도메인과 Zone
-- GitHub Actions가 활성화된 저장소
-- x86-64 Synology/XPEnology의 Container Manager(Docker)
-- Synology에서 Cloudflare로 나가는 HTTPS 연결
-- origin 데이터 디렉터리를 위한 충분한 디스크와 별도 백업
+## Prerequisites
 
-권장 hostname은 다음과 같습니다.
+- A domain and Zone connected to Cloudflare
+- A repository with GitHub Actions enabled
+- Container Manager (Docker) on an x86-64 Synology/XPEnology
+- An outbound HTTPS connection from Synology to Cloudflare
+- Sufficient disk space and a separate backup for the origin data directory
+
+Recommended hostnames:
 
 ```text
-app.example.com          Google 인증 웹 Worker
-img.example.com          공개 이미지 CDN → Tunnel → origin
-origin-admin.example.com Bearer token 관리 API → Tunnel → origin
+app.example.com          Google-authenticated web Worker
+img.example.com          public image CDN → Tunnel → origin
+origin-admin.example.com Bearer-token administrative API → Tunnel → origin
 ```
 
-`img.example.com`은 URL을 아는 누구나 접근할 수 있으므로 주소 자체를 비밀로
-간주하면 안 됩니다. 업로드·삭제·복구 API는 `origin-admin.example.com`으로
-분리하고 origin Bearer token으로 보호합니다.
+Anyone who knows a URL can access `img.example.com`, so the address itself must not be treated as secret. Separate upload, deletion, and restoration APIs on `origin-admin.example.com` and protect them with the origin Bearer token.
 
-## 1. Linux origin 설치
+## 1. Install the Linux origin
 
-- [Node.js 24 Docker origin 설치](origin.md): Container Manager project, 기본
-  `127.0.0.1:8086`
+- [Install the Node.js 24 Docker origin](origin.md): Container Manager project, default `127.0.0.1:8086`
 
-서비스는 loopback 또는 Tunnel이 도달할 수 있는 사설 주소에서만 수신하게 하고
-라우터의 포트 포워딩은 만들지 않습니다. Synology DSM에 Node를 직접 설치하지
-않고 Debian Bookworm 기반 Node.js 24 LTS 컨테이너를 사용합니다. 설치 소스는
-`https://github.com/octopus7/meme`의 `origin/`이며 실제 `.env`와 token은 NAS에만
-둡니다.
+Make the service listen only on loopback or a private address reachable by the Tunnel, and do not create router port forwarding. Do not install Node directly on Synology DSM; use a Debian Bookworm-based Node.js 24 LTS container. The installation source is `https://github.com/octopus7/meme` under `origin/`; keep the actual `.env` and token only on the NAS.
 
-서비스가 정상인지 Linux 서버에서 확인합니다.
+Check that the service is healthy from the Linux server.
 
 ```bash
 curl --fail http://127.0.0.1:8086/healthz
 ```
 
-## 2. Tunnel과 hostname 생성
+## 2. Create the Tunnel and hostnames
 
-1. Cloudflare Tunnel을 만들고 Synology에 `cloudflared` connector를 설치합니다.
-2. `img.example.com` published route를 Node origin의 내부 `8086` 포트에 연결합니다.
-3. `origin-admin.example.com` published route도 같은 origin에 연결합니다.
-4. `origin-admin.example.com` published route에는 별도 Access를 설정하지 않고,
-   origin mutation Bearer token으로 관리 요청을 인증합니다.
-5. `img.example.com`에는 `/i/*`, `/t/*`의 GET/HEAD만 허용하고
-   `/internal/*`, `/healthz`, 모든 쓰기 메서드를 WAF 또는 hostname 규칙으로
-   차단합니다.
+1. Create a Cloudflare Tunnel and install the `cloudflared` connector on Synology.
+2. Connect the `img.example.com` published route to port `8086` of the internal Node origin.
+3. Connect the `origin-admin.example.com` published route to the same origin.
+4. Do not configure separate Access on the `origin-admin.example.com` published route; authenticate administrative requests with the origin mutation Bearer token.
+5. Allow only GET/HEAD for `/i/*` and `/t/*` on `img.example.com`, and block `/internal/*`, `/healthz`, and all write methods with a WAF or hostname rule.
 
-Tunnel token은 Linux의 systemd 자격 증명 또는 Cloudflare 설치 절차에만 사용하고
-GitHub에는 저장하지 않습니다. NAS 라우터의 외부 포트 포워딩은 만들지 않습니다.
+Use the Tunnel token only in Linux systemd credentials or the Cloudflare installation procedure; do not store it in GitHub. Do not create external port forwarding on the NAS router.
 
-## 3. Cloudflare Cache Rule과 purge token
+## 3. Cloudflare Cache Rule and purge token
 
-`img.example.com` Zone에 다음 Cache Rule을 설정합니다.
+Configure the following Cache Rule in the `img.example.com` Zone.
 
-- `/i/*`, `/t/*`를 명시적으로 cache eligible로 지정
-- `/t/{hash}`처럼 확장자가 없는 경로도 포함
-- 200/206 응답의 edge TTL은 1년
-- 404와 5xx는 캐시하지 않음
-- query string은 캐시 키에서 제거하거나 공개 경로에서 거부
-- GET/HEAD 외 메서드는 캐시하지 않음
+- Explicitly mark `/i/*` and `/t/*` as cache eligible
+- Include extensionless paths such as `/t/{hash}`
+- Set the edge TTL for 200/206 responses to one year
+- Do not cache 404 or 5xx responses
+- Remove query strings from the cache key or reject them on public paths
+- Do not cache methods other than GET/HEAD
 
-대상 Zone에 한정된 Cache Purge API token을 만들고 Worker secret
-`CF_CACHE_PURGE_TOKEN`으로 등록합니다. 삭제 시 `blob-<sha256>` cache tag를
-전역 purge합니다. purge는 브라우저 로컬 캐시를 지우지 않으며, 이후 새 네트워크
-요청이 edge MISS일 때 origin 상태를 다시 확인하게 합니다.
+Create a Cache Purge API token restricted to the target Zone and register it as the Worker secret `CF_CACHE_PURGE_TOKEN`. On deletion, purge the `blob-<sha256>` cache tag globally. Purge does not clear browser-local caches; when a later network request is an edge MISS, the origin state is checked again.
 
-## 4. D1 생성
+## 4. Create D1
 
-Cloudflare 대시보드 또는 인증된 Wrangler로 D1을 한 번 생성합니다.
+Create D1 once from the Cloudflare dashboard or authenticated Wrangler.
 
 ```bash
 npx wrangler@latest d1 create <D1_DATABASE_NAME>
 ```
 
-데이터베이스 이름과 ID를 GitHub `web-production`, `d1-production` Environment에
-등록하고 [D1 migration 워크플로](github-actions.md#d1-migration)를 수동 실행합니다.
-노출 기록 테이블(`image_url_exposure_logs`) migration도 이 단계에서 적용됩니다.
+Register the database name and ID in the GitHub `web-production` and `d1-production` Environments, then manually run the [D1 migration workflow](github-actions.md#d1-migration). Apply the exposure-log table (`image_url_exposure_logs`) migration at this stage as well.
 
-## 5. GitHub Environment와 web Worker secret
+## 5. GitHub Environment and web Worker secrets
 
-`web-production` 변수에 다음을 등록합니다.
+Register the following variables in `web-production`.
 
 ```text
 CF_ACCOUNT_ID
@@ -100,10 +83,10 @@ ORIGIN_ADMIN_BASE_URL=https://<ORIGIN_ADMIN_DOMAIN>
 CF_ZONE_ID
 GOOGLE_CLIENT_ID
 GOOGLE_REDIRECT_URI=https://<APP_DOMAIN>/auth/callback
-GOOGLE_ALLOWED_EMAILS=<관리자 이메일 하나>
+GOOGLE_ALLOWED_EMAILS=<one administrator email>
 ```
 
-Cloudflare web Worker encrypted secrets에는 다음을 등록합니다.
+Register the following as Cloudflare web Worker encrypted secrets.
 
 ```text
 GOOGLE_CLIENT_SECRET
@@ -112,37 +95,28 @@ ORIGIN_ADMIN_TOKEN
 CF_CACHE_PURGE_TOKEN
 ```
 
-`ORIGIN_ADMIN_TOKEN`은 origin의 `MEME_ORIGIN_MUTATION_TOKEN`과 동일해야 합니다.
-모든 secret은 32자 이상의 무작위 값으로 만들고 GitHub 변수나 로그에 넣지 않습니다.
+`ORIGIN_ADMIN_TOKEN` must equal the origin's `MEME_ORIGIN_MUTATION_TOKEN`. Generate all secrets as random values of at least 32 characters, and do not put them in GitHub variables or logs.
 
-## 6. Worker 최초 배포
+## 6. First Worker deployment
 
-GitHub Actions에서 다음 순서로 실행합니다.
+Run the following in order from GitHub Actions.
 
 1. `Migrate D1`
 2. `Deploy web Worker`
-3. Cloudflare 대시보드에서 web Worker에 `app.example.com` Custom Domain 연결
-4. `img.example.com`과 `origin-admin.example.com` Tunnel route/Cache Rule 확인
+3. In the Cloudflare dashboard, connect the `app.example.com` Custom Domain to the web Worker.
+4. Verify the `img.example.com` and `origin-admin.example.com` Tunnel routes and Cache Rule.
 
-storage Worker 배포 단계는 없습니다. 이미지 GET은 web Worker가 아니라 Cloudflare
-CDN에서 처리하며, web Worker는 목록·검색 HTML에 `IMAGE_ORIGIN` URL을 포함한 시각을
-D1 노출 기록으로 남깁니다. 이 기록은 실제 다운로드나 HIT를 의미하지 않습니다.
+There is no storage Worker deployment step. Image GET requests are handled by the Cloudflare CDN rather than the web Worker, and the web Worker records in D1 when it includes an `IMAGE_ORIGIN` URL in list and search HTML. This record does not represent an actual download or HIT.
 
-## 7. 운영 점검
+## 7. Operational checks
 
-- 비공개 브라우저 창에서 `app.example.com`을 열면 Google 인증 화면으로 이동합니다.
-- 관리자 Google 계정으로 로그인한 뒤 `/`가 `/all`로 이동합니다.
-- 업로드가 성공하고 원본은 `origin-admin.example.com`을 통해 Synology에 저장됩니다.
-- `/all`과 `/search`의 이미지 URL이 `img.example.com`을 가리키며 노출 기록에
-  시각·파일명·용량·화면·viewer sub가 남습니다.
-- `img.example.com/i/...`와 `/t/...`는 인증 없이 GET/HEAD가 동작하고, 두 번째
-  요청에서 Cloudflare `Cf-Cache-Status`가 `HIT`인지 확인합니다.
-- `img.example.com/internal/*`는 차단되고, `origin-admin.example.com`의 mutation
-  요청은 Bearer token 없이 401을 반환합니다.
-- 마지막 참조 삭제가 origin trash 이동과 cache-tag purge를 모두 완료한 뒤 새
-  네트워크 요청에서 두 이미지 URL이 404가 됩니다(브라우저 로컬 캐시는 남을 수 있음).
-- `/admin`에서 이미지 URL 노출 기록 화면이 열리고, 일반 회원에게는 관리자 화면이
-  보이지 않는지 확인합니다.
+- Open `app.example.com` in a private browser window and confirm that it redirects to Google authentication.
+- Sign in with the administrator Google account and confirm that `/` redirects to `/all`.
+- Confirm that uploads succeed and the original is stored on Synology through `origin-admin.example.com`.
+- Confirm that image URLs in `/all` and `/search` point to `img.example.com` and that the exposure log records the timestamp, filename, size, screen, and viewer sub.
+- Confirm that unauthenticated GET/HEAD works for `img.example.com/i/...` and `/t/...`, and check on the second request that Cloudflare `Cf-Cache-Status` is `HIT`.
+- Confirm that `img.example.com/internal/*` is blocked and that mutation requests to `origin-admin.example.com` return 401 without a Bearer token.
+- After deletion of the last reference completes both the origin trash move and cache-tag purge, confirm that a new network request returns 404 for both image URLs (browser-local caches may remain).
+- Open the image URL exposure-log screen at `/admin` and confirm that ordinary members cannot see the administrator screen.
 
-실서비스 전에는 업로드 중 장애, D1 실패, Tunnel 중단, 디스크 부족과 purge 실패
-재시도를 별도 시험 데이터로 검증합니다.
+Before production service, separately test upload failures, D1 failures, Tunnel interruptions, insufficient disk space, and purge-failure retries with test data.

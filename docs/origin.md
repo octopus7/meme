@@ -1,6 +1,6 @@
 # Node.js 24 Docker origin
 
-[한국어](origin.ko.md) | **English**
+[한국어](origin.KO.md) | **English**
 
 The image origin processes uploads with Node.js 24 LTS and `sharp`. On
 Synology/XPEnology, use Container Manager (Docker) instead of installing Node.js
